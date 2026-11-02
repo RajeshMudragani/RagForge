@@ -1,0 +1,1 @@
+ALTER TABLE "conversations" ADD COLUMN "tenant_id" uuid NOT NULL;

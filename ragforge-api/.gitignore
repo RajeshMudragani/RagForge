@@ -1,0 +1,23 @@
+node_modules/
+dist/
+build/
+
+.env
+.env.*
+!.env.example
+
+logs/
+*.log
+
+coverage/
+
+.vscode/
+
+uploads/
+temp/
+
+*.zip
+
+# Markdown
+*.md
+!README.md

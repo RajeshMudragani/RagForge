@@ -1,0 +1,7 @@
+export const RERANK_CANDIDATE_MULTIPLIER = 2;
+
+export const MIN_RERANK_CHUNKS = 8;
+
+export const DEFAULT_RERANK_CANDIDATES = 10;
+
+export const MAX_RERANK_CONTENT_LENGTH = 300;
