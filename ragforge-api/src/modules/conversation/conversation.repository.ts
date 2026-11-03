@@ -263,6 +263,12 @@ export class ConversationRepository {
             )
     }
 
+    async deleteAllForTenant(tenantId: string): Promise<void> {
+        await db
+            .delete(conversations)
+            .where(eq(conversations.tenantId, tenantId));
+    }
+
     async renameConversation(
         tenantId: string,
         conversationId: string,

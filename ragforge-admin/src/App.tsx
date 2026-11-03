@@ -5,6 +5,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { ChatPage } from "./pages/ChatPage";
 import { DocumentsPage } from "./pages/DocumentsPage";
 import { CollectionsPage } from "./pages/CollectionsPage";
+import { GuestTrialPage } from "./pages/GuestTrialPage";
 
 export default function App() {
     return (
@@ -12,6 +13,7 @@ export default function App() {
             <AuthProvider>
                 <Routes>
                     <Route path="/login" element={<LoginPage />} />
+                    <Route path="/try" element={<GuestTrialPage />} />
                     <Route path="/" element={<AppLayout />}>
                         <Route index element={<Navigate to="/chat" replace />} />
                         <Route path="chat" element={<ChatPage />} />

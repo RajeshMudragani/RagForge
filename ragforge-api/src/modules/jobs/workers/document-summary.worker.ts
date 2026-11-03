@@ -11,10 +11,16 @@ const summaryService = new DocumentSummaryService();
 async function processSummaryJob(
     job: Job<DocumentSummaryJobData>,
 ) {
-
-    await summaryService .generateDocumentSummary(
+    const result = await summaryService.generateDocumentSummary(
         job.data.documentId,
     );
+    if (result.status === "SKIPPED") {
+        logger.info(
+            { jobId: job.id, documentId: job.data.documentId, reason: result.reason },
+            "Skipping document summary for a deleted document",
+        );
+    }
+    return result;
 }
 
 let summaryWorker:
@@ -36,14 +42,11 @@ export function createDocumentSummaryWorker() {
         },
     );
 
-    summaryWorker.on( "completed", job =>
-        logger.info(
-            {
-                jobId: job.id,
-            },
-            "Document summary generated",
-        ),
-    );
+    summaryWorker.on("completed", (job, result) => {
+        if (result.status === "COMPLETED") {
+            logger.info({ jobId: job.id }, "Document summary generated");
+        }
+    });
 
     summaryWorker.on("failed", (job, err) =>
         logger.error(

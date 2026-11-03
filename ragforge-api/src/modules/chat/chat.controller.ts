@@ -58,7 +58,11 @@ export class ChatController {
             );
 
             res.write(`event: done\n`);
-            res.write(`data: ${JSON.stringify({ conversationId: result.conversationId, sources: result.sources })}\n\n`);
+            res.write(`data: ${JSON.stringify({
+                answer: result.answer,
+                conversationId: result.conversationId,
+                sources: result.sources,
+            })}\n\n`);
             res.end();
         } catch (error) {
             if ((error as Error).message === "Aborted") { res.end(); return; }

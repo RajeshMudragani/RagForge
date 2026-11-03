@@ -14,9 +14,9 @@ interface ChatInputProps {
 }
 
 const PROMPT_TYPES: { value: PromptType; label: string; icon: typeof Zap; description: string }[] = [
-    { value: "default", label: "Balanced", icon: AlignLeft, description: "Detailed, comprehensive answers" },
-    { value: "concise", label: "Concise",  icon: Zap,       description: "Short, direct answers"         },
-    { value: "strict",  label: "Strict",   icon: Target,    description: "Only from document context"    },
+    { value: "default", label: "Balanced", icon: AlignLeft, description: "Detailed answers grounded in documents" },
+    { value: "concise", label: "Concise",  icon: Zap,       description: "Short, cited answers from documents"     },
+    { value: "strict",  label: "Strict",   icon: Target,    description: "Evidence-only; declines if unsupported" },
 ];
 
 export function ChatInput({ onSend, isStreaming, onAbort, disabled, promptType, onPromptTypeChange, collectionName }: ChatInputProps) {

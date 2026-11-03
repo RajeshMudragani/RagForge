@@ -6,6 +6,7 @@ import { BadRequestError, NotFoundError } from "../../common/errors/index.js";
 import { CollectionsService } from "../collections/collections.service.js";
 import { MetadataService } from "../metadata/metadata.service.js";
 import { QueueService } from "../jobs/queue/queue.service.js";
+import { redis } from "../../config/redis.config.js";
 
 export class DocumentsService {
     private readonly documentsRepository = new DocumentsRepository();
@@ -116,7 +117,11 @@ export class DocumentsService {
 
     async delete(tenantId: string, documentId: string) {
         const document = await this.findById(tenantId, documentId);
-        if (document.status === DOCUMENT_STATUS.PROCESSING || document.status === DOCUMENT_STATUS.EMBEDDING) {
+        if (
+            document.status === DOCUMENT_STATUS.PENDING ||
+            document.status === DOCUMENT_STATUS.PROCESSING ||
+            document.status === DOCUMENT_STATUS.EMBEDDING
+        ) {
             throw new BadRequestError("Wait for document processing to finish before deleting it.");
         }
 
@@ -125,6 +130,8 @@ export class DocumentsService {
         if (!deleted) {
             throw new NotFoundError("Document");
         }
+        const cacheKeys = await redis.keys(`retrieval:*:${tenantId}:*`);
+        if (cacheKeys.length > 0) await redis.del(cacheKeys);
         return deleted;
     }
 

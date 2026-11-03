@@ -16,11 +16,12 @@ export class DocumentSummaryService {
 
     async generateDocumentSummary(
         documentId: string,
-    ) {
+    ): Promise<{ status: "COMPLETED" | "SKIPPED"; reason?: "DOCUMENT_DELETED" }> {
         const document = await this.repository.findDocumentOwner(documentId);
-        if (!document) throw new Error(`Document ${documentId} not found`);
+        if (!document) return { status: "SKIPPED", reason: "DOCUMENT_DELETED" };
 
-        await this.repository.updateDocumentSummaryStatus(documentId, "PROCESSING");
+        const processingDocument = await this.repository.updateDocumentSummaryStatus(documentId, "PROCESSING");
+        if (!processingDocument) return { status: "SKIPPED", reason: "DOCUMENT_DELETED" };
 
         try {
             const content = await this.retrievalRepository.getDocumentContent(documentId);
@@ -45,6 +46,7 @@ export class DocumentSummaryService {
 
             const response = await this.llm.generate(prompt, undefined, {
                 maxOutputTokens: SUMMARY_OUTPUT_TOKEN_LIMIT,
+                responseFormat: "json",
             });
             const cleaned = response.replace(/```json/gi, "").replace(/```/g, "").trim();
             const parsed: unknown = JSON.parse(cleaned);
@@ -67,16 +69,18 @@ export class DocumentSummaryService {
                 throw new Error("Document summary response did not match the expected format");
             }
 
-            await this.repository.upsert(
+            const saved = await this.repository.saveSummaryIfDocumentExists(
                 documentId,
                 parsed.summary,
                 parsed.shortSummary,
                 parsed.keyTopics,
                 parsed.keywords,
             );
-            await this.repository.updateDocumentSummaryStatus(documentId, "COMPLETED");
+            if (!saved) return { status: "SKIPPED", reason: "DOCUMENT_DELETED" };
+            return { status: "COMPLETED" };
         } catch (error) {
-            await this.repository.updateDocumentSummaryStatus(documentId, "FAILED");
+            const failedDocument = await this.repository.updateDocumentSummaryStatus(documentId, "FAILED");
+            if (!failedDocument) return { status: "SKIPPED", reason: "DOCUMENT_DELETED" };
             throw error;
         }
     }

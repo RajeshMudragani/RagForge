@@ -1,5 +1,6 @@
 export interface LlmGenerateOptions {
     maxOutputTokens?: number;
+    responseFormat?: "json";
 }
 
 export interface LlmProvider {

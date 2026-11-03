@@ -51,8 +51,17 @@ export class GeminiProvider {
                 this.ai.models.generateContent({
                     model: env.GEMINI_MODEL,
                     contents: prompt,
-                    ...(options?.maxOutputTokens
-                        ? { config: { maxOutputTokens: options.maxOutputTokens } }
+                    ...(options?.maxOutputTokens || options?.responseFormat === "json"
+                        ? {
+                            config: {
+                                ...(options.maxOutputTokens
+                                    ? { maxOutputTokens: options.maxOutputTokens }
+                                    : {}),
+                                ...(options.responseFormat === "json"
+                                    ? { responseMimeType: "application/json" }
+                                    : {}),
+                            },
+                        }
                         : {}),
                 }),
                 signal,

@@ -10,9 +10,11 @@ import { documentJobsTotal } from "../../metrics/metrics.registry.js";
 import { NotFoundError } from "../../../common/errors/index.js";
 import { documentSummaryQueue } from "../queue/document-summary.queue.js";
 import { DOCUMENT_SUMMARY_JOBS } from "../jobs/document-summary.job.js";
+import { GuestSessionRepository } from "../../guest/guest-session.repository.js";
 
 
 const ingestionService = new IngestionService();
+const guestSessions = new GuestSessionRepository();
 
 async function processDocumentJob(job: Job<DocumentJobData>) {
 
@@ -33,11 +35,15 @@ async function processDocumentJob(job: Job<DocumentJobData>) {
         throw err;
     });
 
-    await documentSummaryQueue.add(
-        DOCUMENT_SUMMARY_JOBS.GENERATE_DOCUMENT_SUMMARY, {
-            documentId: job.data.documentId,
-        },
-    );
+    if (!(await guestSessions.isGuestSession(job.data.tenantId))) {
+        await documentSummaryQueue.add(
+            DOCUMENT_SUMMARY_JOBS.GENERATE_DOCUMENT_SUMMARY, {
+                documentId: job.data.documentId,
+            }, {
+                jobId: `summary-${job.data.documentId}`,
+            },
+        );
+    }
 
     await job.updateProgress(100);
 }

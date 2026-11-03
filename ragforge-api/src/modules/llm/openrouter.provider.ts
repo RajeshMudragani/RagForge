@@ -28,6 +28,9 @@ export class OpenRouterProvider {
                         },
                     ],
                     ...(options?.maxOutputTokens ? { max_tokens: options.maxOutputTokens } : {}),
+                    ...(options?.responseFormat === "json"
+                        ? { response_format: { type: "json_object" } }
+                        : {}),
                 }),
             },
         );
@@ -81,44 +84,60 @@ export class OpenRouterProvider {
             },
         );
 
+        if (!response.ok) {
+            throw new Error(`OpenRouter stream request failed: ${response.status}`);
+        }
+
         if (!response.body) {
             throw new Error("Missing response body");
         }
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
+        let buffer = "";
+
+        const processLine = (rawLine: string) => {
+            const line = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine;
+            if (!line.startsWith("data:")) return;
+
+            const content = line.slice("data:".length).trimStart();
+            if (!content || content === "[DONE]") return;
+
+            let parsed: {
+                choices?: Array<{
+                    delta?: {
+                        content?: unknown;
+                    };
+                }>;
+            };
+            try {
+                parsed = JSON.parse(content);
+            } catch {
+                throw new Error("OpenRouter returned malformed streaming data.");
+            }
+
+            const token = parsed.choices?.[0]?.delta?.content;
+            if (typeof token === "string" && token.length > 0) {
+                fullResponse += token;
+                onToken(token);
+            }
+        };
 
         while (true) {
             const { done, value } = await reader.read();
-
             if (done) break;
 
-            const chunk = decoder.decode(value);
-
-            const lines = chunk
-                .split("\n")
-                .filter((line) => line.startsWith("data:"));
-
-            for (const line of lines) {
-                const content = line.replace("data:", "").trim();
-
-                if (content === "[DONE]") continue;
-
-                try {
-                    const parsed = JSON.parse(content);
-
-                    const token =
-                        parsed.choices?.[0]?.delta?.content;
-
-                    if (token) {
-                        fullResponse += token;
-                        onToken(token);
-                    }
-                } catch {
-                    // ignore partial chunks
-                }
+            buffer += decoder.decode(value, { stream: true });
+            let newline = buffer.indexOf("\n");
+            while (newline !== -1) {
+                processLine(buffer.slice(0, newline));
+                buffer = buffer.slice(newline + 1);
+                newline = buffer.indexOf("\n");
             }
         }
+
+        buffer += decoder.decode();
+        if (buffer) processLine(buffer);
 
         return fullResponse;
     }

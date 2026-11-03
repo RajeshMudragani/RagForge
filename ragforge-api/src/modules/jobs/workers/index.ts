@@ -5,6 +5,9 @@ import { createNotificationWorker, closeNotificationWorker } from "./notificatio
 import { documentQueue } from "../queue/queue.config.js";
 import { DocumentsRepository } from "../../documents/documents.repository.js";
 import { closeDocumentSummaryWorker, createDocumentSummaryWorker } from "./document-summary.worker.js";
+import { GuestSessionCleanupService } from "../../guest/guest-session-cleanup.service.js";
+
+const guestSessionCleanup = new GuestSessionCleanupService();
 
 export async function startWorkers(): Promise<void> {
     try {
@@ -31,6 +34,7 @@ export async function startWorkers(): Promise<void> {
     createDocumentSummaryWorker();
     createEvaluationWorker();
     createNotificationWorker();
+    guestSessionCleanup.start();
 
     logger.info(
         "Workers started: document, document-summary, evaluation, notification",
@@ -44,5 +48,6 @@ export async function closeWorkers(): Promise<void> {
         closeEvaluationWorker(),
         closeNotificationWorker(),
     ]);
+    guestSessionCleanup.stop();
     logger.info("All workers closed");
 }

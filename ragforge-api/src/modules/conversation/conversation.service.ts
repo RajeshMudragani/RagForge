@@ -175,6 +175,10 @@ export class ConversationService {
         await this.repository.deleteConversation(tenantId, conversationId);
     }
 
+    async deleteAllForTenant(tenantId: string): Promise<void> {
+        await this.repository.deleteAllForTenant(tenantId);
+    }
+
     async renameConversation(
         tenantId: string,
         conversationId: string,

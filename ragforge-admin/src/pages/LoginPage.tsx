@@ -121,6 +121,12 @@ export function LoginPage() {
                 <p className="text-center text-sm text-surface-400 mt-6">
                     Enterprise-grade RAG · Built with OpenRouter &amp; PostgreSQL
                 </p>
+                <p className="mt-3 text-center text-sm text-surface-500">
+                    Want to try it first?{" "}
+                    <a href="/try" className="font-medium text-brand-600 hover:text-brand-700">
+                        Upload a document without signing in
+                    </a>
+                </p>
             </div>
         </div>
     );

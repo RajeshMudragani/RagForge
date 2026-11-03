@@ -14,6 +14,7 @@ import authRouter from "./auth/auth.router.js";
 import tenantsRouter from "./tenants/tenants.router.js";
 import metricsRouter from "./metrics/metrics.router.js";
 import DocumentSummaryRouter from "./document-summary/document-summary.routes.js";
+import guestRouter from "./guest/guest.router.js";
 
 const router = Router();
 
@@ -32,5 +33,6 @@ router.use("/auth", authRouter);
 router.use("/tenants", tenantsRouter);
 router.use("/metrics", metricsRouter);
 router.use("/document-summary", DocumentSummaryRouter);
+router.use("/guest", guestRouter);
 
 export default router;

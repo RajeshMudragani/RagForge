@@ -122,11 +122,19 @@ export class RetrievalRepository {
     async addEmbeddings(chunks: DocumentChunkInput[]): Promise<void> {
         if (chunks.length === 0) return;
 
+        const documentId = chunks[0].documentId;
+        if (chunks.some(chunk => chunk.documentId !== documentId)) {
+            throw new Error("Embedding batch must belong to a single document");
+        }
+
         const hashes = chunks.map(c => c.contentHash);
         const existing = await db
             .select({ contentHash: documentChunks.contentHash })
             .from(documentChunks)
-            .where(inArray(documentChunks.contentHash, hashes));
+            .where(and(
+                eq(documentChunks.documentId, documentId),
+                inArray(documentChunks.contentHash, hashes),
+            ));
 
         const existingHashes = new Set(existing.map(r => r.contentHash));
         const newChunks = chunks.filter(c => !existingHashes.has(c.contentHash));

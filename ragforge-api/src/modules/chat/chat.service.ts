@@ -11,6 +11,7 @@ import { EvaluationService } from "../evaluation/evaluation.service.js";
 import { logger } from "../../logger/logger.js";
 import { LlmFactory } from "../llm/llm.factory.js";
 import { DocumentSummaryRepository } from "../document-summary/document-summary.repository.js";
+import { SpreadsheetCountService } from "./spreadsheet-count.service.js";
 
 // Singletons — instantiated once at module load, shared across all requests
 const retrievalService = new RetrievalService();
@@ -23,6 +24,7 @@ const queryRouter = new QueryRouterService();
 const summarizer = new ConversationSummarizerService();
 const evaluationService = new EvaluationService();
 const documentSummaryRepository = new DocumentSummaryRepository();
+const spreadsheetCountService = new SpreadsheetCountService();
 
 const STREAM_TIMEOUT_MS = 120_000;
 const NO_RELEVANT_DOCUMENTS_ANSWER =
@@ -46,6 +48,7 @@ export class ChatService {
     private readonly summarizer = summarizer;
     private readonly evaluationService = evaluationService;
     private readonly documentSummaryRepository = documentSummaryRepository;
+    private readonly spreadsheetCountService = spreadsheetCountService;
 
     async chat(
         question: string,
@@ -55,6 +58,8 @@ export class ChatService {
         conversationId?: string,
         collectionName?: string,
         metadata?: Record<string, string>,
+        queueEvaluation = true,
+        generateTitle = true,
     ): Promise<ChatResponse> {
 
         const isNewConversation = !conversationId;
@@ -126,6 +131,17 @@ export class ChatService {
                 conversationalPrompt,
             );
 
+        } else if (route === "spreadsheet_count") {
+            const result = await this.spreadsheetCountService.countOrdersByStatus(
+                question,
+                tenantId,
+                collectionName,
+                metadata,
+            );
+            answer = result?.answer ??
+                "I couldn't calculate that count because no completed spreadsheet with order IDs and a status column was found.";
+            builtContext.sources = result?.sources ?? [];
+
         } else if (route === "summary") {
             const summary = await this.buildKnowledgeBaseSummary(
                 question,
@@ -154,6 +170,7 @@ export class ChatService {
             rewrittenQuery = rewritten;
 
             const allQueries = [
+                question,
                 rewrittenQuery,
                 ...expansions,
             ];
@@ -171,36 +188,13 @@ export class ChatService {
                     ),
                 );
 
-            const sourceMap =
-                new Map<
-                    string,
-                    ChatResponse["sources"][number]
-                >();
-
-            for (const ctx of allContexts) {
-                for (const s of ctx.sources) {
-
-                    const key =
-                        `${s.documentId}-${s.chunkIndex}`;
-
-                    const existing =
-                        sourceMap.get(key);
-
-                    if (
-                        !existing ||
-                        (s.hybridScore ?? 0) >
-                        (existing.hybridScore ?? 0)
-                    ) {
-                        sourceMap.set(key, s);
-                    }
-                }
-            }
+            const selectedContext = allContexts.find(
+                context => context.context.trim().length > 0 && context.sources.length > 0,
+            );
 
             builtContext = {
-                context: allContexts[0]?.context ?? "",
-                sources: Array.from(
-                    sourceMap.values(),
-                ).slice(0, topK),
+                context: selectedContext?.context ?? "",
+                sources: selectedContext?.sources.slice(0, topK) ?? [],
             };
 
             logger.info(
@@ -240,6 +234,9 @@ export class ChatService {
             }
         }
 
+        builtContext.sources = this.filterSourcesByCitations(answer, builtContext.sources);
+        answer = this.removeInlineSourceCitations(answer);
+
         await this.conversationService.addUserMessage(
             currentConversationId,
             question,
@@ -249,7 +246,7 @@ export class ChatService {
             answer,
         );
 
-        if (isNewConversation) {
+        if (isNewConversation && generateTitle) {
             this.conversationService
                 .generateAndSaveTitle(
                     tenantId,
@@ -264,19 +261,21 @@ export class ChatService {
                 );
         }
 
-        this.evaluationService
-            .queueEvaluation(
-                question,
-                answer,
-                topK,
-                tenantId,
-            )
-            .catch(err =>
-                logger.warn(
-                    { err },
-                    "Failed to queue auto-evaluation",
-                ),
-            );
+        if (queueEvaluation) {
+            this.evaluationService
+                .queueEvaluation(
+                    question,
+                    answer,
+                    topK,
+                    tenantId,
+                )
+                .catch(err =>
+                    logger.warn(
+                        { err },
+                        "Failed to queue auto-evaluation",
+                    ),
+                );
+        }
 
         return {
             answer,
@@ -297,6 +296,7 @@ export class ChatService {
         conversationId?: string,
         collectionName?: string,
         metadata?: Record<string, string>,
+        generateTitle = true,
     ): Promise<{
         answer: string;
         conversationId: string;
@@ -373,6 +373,17 @@ export class ChatService {
                     onToken,
                     signal,
                 );
+            } else if (route === "spreadsheet_count") {
+                const result = await this.spreadsheetCountService.countOrdersByStatus(
+                    question,
+                    tenantId,
+                    collectionName,
+                    metadata,
+                );
+                answer = result?.answer ??
+                    "I couldn't calculate that count because no completed spreadsheet with order IDs and a status column was found.";
+                builtContext.sources = result?.sources ?? [];
+                onToken(answer);
             } else if (route === "summary") {
                 const summary = await this.buildKnowledgeBaseSummary(
                     question,
@@ -404,6 +415,7 @@ export class ChatService {
             rewrittenQuery = rewritten;
 
             const allQueries = [
+                question,
                 rewrittenQuery,
                 ...expansions,
             ];
@@ -420,36 +432,13 @@ export class ChatService {
                 ),
             );
 
-            const sourceMap =
-                new Map<
-                    string,
-                    ChatResponse["sources"][number]
-                >();
-
-            for (const ctx of allContexts) {
-                for (const s of ctx.sources) {
-
-                    const key =
-                        `${s.documentId}-${s.chunkIndex}`;
-
-                    const existing =
-                        sourceMap.get(key);
-
-                    if (
-                        !existing ||
-                        (s.hybridScore ?? 0) >
-                        (existing.hybridScore ?? 0)
-                    ) {
-                        sourceMap.set(key, s);
-                    }
-                }
-            }
+            const selectedContext = allContexts.find(
+                context => context.context.trim().length > 0 && context.sources.length > 0,
+            );
 
             builtContext = {
-                context: allContexts[0]?.context ?? "",
-                sources: Array.from(
-                    sourceMap.values(),
-                ).slice(0, topK),
+                context: selectedContext?.context ?? "",
+                sources: selectedContext?.sources.slice(0, topK) ?? [],
             };
 
             logger.info(
@@ -507,6 +496,9 @@ export class ChatService {
             }
         }
 
+        builtContext.sources = this.filterSourcesByCitations(answer, builtContext.sources);
+        answer = this.removeInlineSourceCitations(answer);
+
         await this.conversationService.addUserMessage(
             currentConversationId,
             question,
@@ -516,7 +508,7 @@ export class ChatService {
             answer,
         );
 
-        if (isNewConversation) {
+        if (isNewConversation && generateTitle) {
             this.conversationService
                 .generateAndSaveTitle(
                     tenantId,
@@ -620,5 +612,25 @@ export class ChatService {
             DOCUMENT INFORMATION:
             ${context}
         `;
+    }
+
+    private filterSourcesByCitations(
+        answer: string,
+        sources: ChatResponse["sources"],
+    ): ChatResponse["sources"] {
+        const citedSourceNumbers = new Set(
+            Array.from(answer.matchAll(/\[Source\s+(\d+)\s*:/gi), match => Number(match[1])),
+        );
+        if (citedSourceNumbers.size === 0) return sources;
+
+        return sources.filter((_source, index) => citedSourceNumbers.has(index + 1));
+    }
+
+    private removeInlineSourceCitations(answer: string): string {
+        return answer
+            .replace(/\s*\[Source\s+\d+\s*:[^\]]*\]/gi, "")
+            .replace(/[ \t]+([.,;!?])/g, "$1")
+            .replace(/[ \t]+\n/g, "\n")
+            .trim();
     }
 }

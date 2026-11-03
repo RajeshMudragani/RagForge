@@ -16,12 +16,14 @@ const PLACEHOLDER_ID = "__streaming__";
 export function useChat(options: UseChatOptions = {}) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [isStreaming, setIsStreaming] = useState(false);
+    const [isLoadingConversation, setIsLoadingConversation] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [currentConversationId, setCurrentConversationId] = useState<string | undefined>(
         options.conversationId,
     );
 
     const abortRef = useRef<AbortController | null>(null);
+    const conversationLoadIdRef = useRef(0);
     const conversationIdRef = useRef<string | undefined>(options.conversationId);
     const accessToken = localStorage.getItem("accessToken");
 
@@ -34,9 +36,22 @@ export function useChat(options: UseChatOptions = {}) {
     }, []);
 
     const loadConversation = useCallback(async (id: string) => {
+        const loadId = ++conversationLoadIdRef.current;
+        setConversationId(id);
+        setMessages([]);
+        setError(null);
+        setIsLoadingConversation(true);
+
         try {
             const res = await chatApi.getConversation(id);
-            const { messages: msgs } = res.data.data;
+            if (loadId !== conversationLoadIdRef.current) return;
+
+            const { conversation, messages: msgs } = res.data.data;
+            if (!conversation) {
+                setError("Conversation not found.");
+                return;
+            }
+
             setMessages(
                 msgs.map((m) => ({
                     id: m.id,
@@ -45,9 +60,14 @@ export function useChat(options: UseChatOptions = {}) {
                     createdAt: m.createdAt,
                 })),
             );
-            setConversationId(id);
         } catch {
-            setError("Failed to load conversation.");
+            if (loadId === conversationLoadIdRef.current) {
+                setError("Failed to load conversation.");
+            }
+        } finally {
+            if (loadId === conversationLoadIdRef.current) {
+                setIsLoadingConversation(false);
+            }
         }
     }, [setConversationId]);
 
@@ -143,6 +163,16 @@ export function useChat(options: UseChatOptions = {}) {
                                     } else if (parsed?.conversationId) {
                                         resolvedConvId = parsed.conversationId;
                                         if (parsed.sources) sources = parsed.sources;
+                                        if (typeof parsed.answer === "string") {
+                                            accumulatedContent = parsed.answer;
+                                            setMessages((prev) =>
+                                                    prev.map((m) =>
+                                                        m.id === PLACEHOLDER_ID
+                                                            ? { ...m, content: accumulatedContent }
+                                                            : m,
+                                                    ),
+                                            );
+                                        }
                                     }
                                 } catch {
                                     // skip malformed tokens
@@ -201,6 +231,8 @@ export function useChat(options: UseChatOptions = {}) {
     }, []);
 
     const clear = useCallback(() => {
+        conversationLoadIdRef.current++;
+        setIsLoadingConversation(false);
         setMessages([]);
         setConversationId(undefined);
         setError(null);
@@ -210,6 +242,7 @@ export function useChat(options: UseChatOptions = {}) {
         messages,
         setMessages,
         isStreaming,
+        isLoadingConversation,
         error,
         currentConversationId,
         setCurrentConversationId: setConversationId,

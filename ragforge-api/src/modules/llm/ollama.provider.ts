@@ -18,6 +18,7 @@ export class OllamaService {
                 model: OLLAMA_LLM_MODEL,
                 prompt,
                 stream: false,
+                ...(options?.responseFormat === "json" ? { format: "json" } : {}),
                 ...(options?.maxOutputTokens
                     ? { options: { num_predict: options.maxOutputTokens, temperature: 0.1 } }
                     : {}),

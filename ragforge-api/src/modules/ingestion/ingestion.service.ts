@@ -44,9 +44,15 @@ export class IngestionService {
                 throw new Error(`Unsupported document type: ${document.filename}`);
             }
             const rawText = (await this.extractionService.extract(buffer, extension)).text;
+            if (!rawText.trim()) {
+                throw new Error(`No text could be extracted from ${document.filename}`);
+            }
 
             const redactedText = this.piiRedaction.redact(rawText);
             const childChunks = this.chunkingService.chunk(redactedText);
+            if (childChunks.length === 0) {
+                throw new Error(`No searchable text could be extracted from ${document.filename}`);
+            }
 
             let enrichedContents: string[];
             if (env.CONTEXTUAL_ENRICHMENT_ENABLED) {
@@ -87,7 +93,7 @@ export class IngestionService {
             await this.retrievalRepository.addEmbeddings(chunkInputs);
 
             // Bust retrieval cache for this tenant so new document is immediately searchable
-            const pattern = `retrieval:${document.tenantId}:*`;
+            const pattern = `retrieval:*:${document.tenantId}:*`;
             const keys = await redis.keys(pattern);
             if (keys.length > 0) await redis.del(keys);
 

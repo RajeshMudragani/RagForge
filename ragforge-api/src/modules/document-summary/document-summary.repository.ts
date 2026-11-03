@@ -5,19 +5,6 @@ import { documents } from "../../database/schema/documents.schema.js";
 import { collections } from "../../database/schema/collections.schema.js";
 
 export class DocumentSummaryRepository {
-
-    async create(data: {
-        documentId: string;
-        summary: string;
-        shortSummary?: string;
-        keyTopics?: string[];
-        keywords?: string[];
-    }) {
-
-        const [result] = await db.insert(documentSummaries).values(data).returning();
-        return result;
-    }
-
     async findByDocumentId(
         documentId: string,
     ) {
@@ -89,46 +76,54 @@ export class DocumentSummaryRepository {
         return document;
     }
 
-    async upsert(
+    async saveSummaryIfDocumentExists(
         documentId: string,
         summary: string,
         shortSummary: string,
         keyTopics: string[],
         keywords: string[],
-    ) {
+    ): Promise<boolean> {
+        return db.transaction(async (tx) => {
+            const [document] = await tx
+                .select({ id: documents.id })
+                .from(documents)
+                .where(eq(documents.id, documentId))
+                .for("update");
 
-        const existing = await this.findByDocumentId(
-            documentId,
-        );
+            if (!document) return false;
 
-        if (existing) {
-            const [updated] = await db
-                .update(documentSummaries)
-                .set({
+            const [existing] = await tx
+                .select({ id: documentSummaries.id })
+                .from(documentSummaries)
+                .where(eq(documentSummaries.documentId, documentId));
+
+            if (existing) {
+                await tx
+                    .update(documentSummaries)
+                    .set({
+                        summary,
+                        shortSummary,
+                        keyTopics,
+                        keywords,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(documentSummaries.id, existing.id));
+            } else {
+                await tx.insert(documentSummaries).values({
+                    documentId,
                     summary,
                     shortSummary,
                     keyTopics,
                     keywords,
-                    updatedAt:
-                        new Date(),
-                })
-                .where(
-                    eq(
-                        documentSummaries.documentId,
-                        documentId,
-                    ),
-                )
-                .returning();
+                });
+            }
 
-            return updated;
-        }
+            await tx
+                .update(documents)
+                .set({ summaryStatus: "COMPLETED", updatedAt: new Date() })
+                .where(eq(documents.id, documentId));
 
-        return this.create({
-            documentId,
-            summary,
-            shortSummary,
-            keyTopics,
-            keywords,
+            return true;
         });
     }
 

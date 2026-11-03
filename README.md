@@ -49,12 +49,13 @@ This project is a complete, self-hosted RAG backend. You own the data, you own t
 
 - **Authentication** — JWT (RS256) with per-tenant isolation. All document and chat routes require a Bearer token
 - **Document ingestion** — Upload PDF, TXT, Markdown, and DOCX files
+- **Guest trial** — Upload up to 3 files (10 MB each), ask questions without signing in, and have trial data automatically deleted after 24 hours
 - **Automatic chunking** — Documents are split into overlapping chunks for better retrieval coverage
 - **Vector embeddings** — Each chunk is converted to a numerical vector using Ollama's embedding models
 - **Hybrid search** — Combines semantic vector search (meaning-based) with keyword full-text search for best-of-both-worlds retrieval
 - **Query rewriting** — Short follow-up questions are automatically expanded using conversation history before searching
 - **Multi-turn conversations** — Conversation memory is maintained per session via a unique `conversationId`
-- **Multiple prompt modes** — Choose between `default`, `strict` (evidence-only), and `concise` (bullet points) response styles
+- **Grounded prompt modes** — `default`, `strict`, and `concise` all answer from retrieved document evidence; `concise` uses bullets
 - **Async ingestion** — Document processing runs in a BullMQ background worker. Upload returns immediately; poll for `READY` status
 - **Fully local** — Runs entirely on your own infrastructure using Ollama. No OpenAI API keys, no data leaving your network
 - **Structured error handling** — Every error returns a consistent JSON shape with typed error codes
@@ -334,6 +335,20 @@ Authorization: Bearer <accessToken>
 
 Obtain a token via `POST /api/v1/auth/login`. The token encodes the user's `tenantId` — all queries are automatically scoped to that tenant.
 
+The guest trial is available at `/try` in the admin application. It issues a random, temporary guest-session token, isolated from account tenants. Guest sessions can upload up to 3 files of 10 MB each; uploaded files, indexed content, and chat history are removed after 24 hours.
+
+These guest endpoints are the exception to the authenticated API routes described above; they require the temporary guest token instead of an account JWT.
+
+| Method | Endpoint | Auth Required | Description |
+| ------ | -------- | ------------- | ----------- |
+| `POST` | `/api/v1/guest/session` | No | Create a temporary guest session |
+| `POST` | `/api/v1/guest/documents/upload` | Guest token | Upload a trial document |
+| `GET` | `/api/v1/guest/documents` | Guest token | List trial documents and processing statuses |
+| `DELETE` | `/api/v1/guest/documents/:id` | Guest token | Delete a trial document and free an upload slot (after processing) |
+| `DELETE` | `/api/v1/guest/session/data` | Guest token | Delete all trial documents and chat history, then reset the upload limit |
+| `POST` | `/api/v1/guest/chat` | Guest token | Ask a question about trial documents |
+| `GET` | `/api/v1/guest/conversations/:id` | Guest token | Restore chat history in the same trial session |
+
 ---
 
 ### Auth
@@ -597,9 +612,11 @@ Authorization: Bearer <token>
 
 | Type        | Behaviour                                                                                | Best For                               |
 | ----------- | ---------------------------------------------------------------------------------------- | -------------------------------------- |
-| `default` | Helpful assistant, uses context but can supplement with general knowledge                | General Q&A                            |
-| `strict`  | Answers ONLY from provided context. Returns evidence quotes. Refuses if answer not found | Compliance, legal, auditable use cases |
-| `concise` | Returns bullet-point answers only                                                        | Quick lookups, summaries               |
+| `default` | Answers from retrieved context only, cites supporting sources, and declines unsupported questions | Grounded document Q&A |
+| `strict`  | Evidence-only answers; declines when context is insufficient                                         | Compliance-sensitive use cases |
+| `concise` | Evidence-only bullet-point answers with source citations                                              | Quick grounded lookups |
+
+All document-answering prompt modes prohibit filling gaps with model knowledge. This reduces unsupported answers but cannot guarantee that a language model will never hallucinate; retrieval quality and the source documents still matter. Check the returned sources when validating an answer.
 
 **Response `200`**
 
@@ -847,11 +864,13 @@ This dramatically improves retrieval quality for follow-up questions. The rewrit
 
 ### Prompt Modes
 
-The system supports three prompt templates that change how the LLM responds:
+The system supports three prompt templates that change how the LLM responds. All three are grounded in retrieved document context and should not use outside knowledge to fill gaps:
 
-- **`default`** — General helpful assistant. Uses context but can draw on general knowledge to fill gaps.
-- **`strict`** — Enterprise knowledge assistant. Answers ONLY from the provided document context. Returns a quoted evidence section. Responds with "I could not find that information" if the answer is not in the documents. Use this for compliance-sensitive applications.
-- **`concise`** — Returns bullet-point answers only. Best for quick lookups.
+- **`default`** — Normal-length answers with source citations; declines when the retrieved documents do not support an answer.
+- **`strict`** — Evidence-only answers for compliance-sensitive use; declines when context is insufficient.
+- **`concise`** — Brief, cited bullet-point answers.
+
+These prompt rules reduce hallucinations but are not a formal guarantee. Review returned source chunks, especially for high-stakes decisions.
 
 ---
 

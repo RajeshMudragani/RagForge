@@ -85,6 +85,13 @@
       "when": 1793638277863,
       "tag": "0011_complex_famine",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793703182609,
+      "tag": "0012_guest_sessions",
+      "breakpoints": true
     }
   ]
 }

@@ -48,6 +48,7 @@ export function ChatPage() {
     const {
         messages,
         isStreaming,
+        isLoadingConversation,
         error,
         currentConversationId,
         loadConversation,
@@ -66,7 +67,7 @@ export function ChatPage() {
             // Re-fetch after a short delay to pick up the AI-generated title
             setTimeout(() => {
                 chatApi.getConversation(id).then((res) => {
-                    const { title, updatedAt } = res.data.data.conversation;
+                    const { title } = res.data.data.conversation;
                     if (title) updateTitle(id, title);
                 }).catch(() => {});
             }, 3000);
@@ -78,13 +79,13 @@ export function ChatPage() {
 
     // Load conversation from URL
     useEffect(() => {
-        if (urlConvId && urlConvId !== currentConversationId) {
+        if (urlConvId) {
             loadConversation(urlConvId);
         } else if (!urlConvId) {
             clear();
             setCurrentConversationId(undefined);
         }
-    }, [urlConvId]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [urlConvId, loadConversation, clear, setCurrentConversationId]);
 
     // Fetch collections for the filter
     useEffect(() => {
@@ -154,7 +155,7 @@ export function ChatPage() {
         [messages],
     );
 
-    const isEmpty = messages.length === 0;
+    const isEmpty = !isLoadingConversation && messages.length === 0;
 
     return (
         <div className="flex flex-col h-full bg-surface-50 relative">
@@ -166,7 +167,7 @@ export function ChatPage() {
                     </div>
                     <div>
                         <h1 className="text-sm font-semibold text-[#1e1c1a] sm:text-base">RAG Assistant</h1>
-                        <p className="text-xs text-surface-400">Powered by Ollama</p>
+                        <p className="text-xs text-surface-400">Powered by OpenRouter</p>
                     </div>
                 </div>
 
@@ -261,7 +262,11 @@ export function ChatPage() {
                 onScroll={handleScroll}
                 className="flex-1 overflow-y-auto scrollbar-thin"
             >
-                {isEmpty ? (
+                {isLoadingConversation ? (
+                    <div className="flex h-full items-center justify-center text-sm text-surface-500">
+                        Loading conversation...
+                    </div>
+                ) : isEmpty ? (
                     <div className="flex flex-col items-center justify-center h-full px-6 py-12 animate-fade-in">
                         {/* Bot avatar */}
                         <div className="w-16 h-16 rounded-2xl bg-brand-500 flex items-center justify-center mb-6 shadow-panel shrink-0">
