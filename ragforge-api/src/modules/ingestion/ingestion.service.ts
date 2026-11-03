@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 import { DocumentsRepository } from "../documents/documents.repository.js";
-import { DOCUMENT_STATUS } from "../documents/documents.constants.js";
+import { DOCUMENT_STATUS, getSupportedDocumentExtension } from "../documents/documents.constants.js";
 import { MinioService } from "../../storage/minio/minio.service.js";
 import { ExtractionService } from "./extraction.service.js";
 import { ChunkingService } from "./chunking.service.js";
@@ -39,10 +39,11 @@ export class IngestionService {
 
         try {
             const buffer = await this.minioService.downloadObjectAsBuffer(document.storageKey);
-            const isPdf = document.mimeType === "application/pdf";
-            const rawText = isPdf
-                ? (await this.extractionService.extractPdf(buffer)).text
-                : buffer.toString("utf-8");
+            const extension = getSupportedDocumentExtension(document.filename);
+            if (!extension) {
+                throw new Error(`Unsupported document type: ${document.filename}`);
+            }
+            const rawText = (await this.extractionService.extract(buffer, extension)).text;
 
             const redactedText = this.piiRedaction.redact(rawText);
             const childChunks = this.chunkingService.chunk(redactedText);

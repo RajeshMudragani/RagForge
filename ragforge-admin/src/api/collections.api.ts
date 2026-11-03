@@ -14,8 +14,8 @@ export const collectionsApi = {
     create: (name: string, description?: string) =>
         api.post<ApiResponse<{ id: string }>>("/collections", { name, description }),
 
-    update: (id: string, data: { name?: string; description?: string }) =>
-        api.patch<ApiResponse<Collection>>(`/collections/${id}`, data),
+    update: (id: string, data: { name?: string; description?: string | null }) =>
+        api.patch<ApiResponse<{ updated: boolean }>>(`/collections/${id}`, data),
 
     delete: (id: string) =>
         api.delete(`/collections/${id}`),

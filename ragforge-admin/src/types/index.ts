@@ -24,9 +24,24 @@ export interface Document {
     progress?: number;
     collectionId?: string | null;
     collectionName?: string | null;
+    summary?: string | null;
+    shortSummary?: string | null;
+    keyTopics?: string[] | null;
+    keywords?: string[] | null;
+    summaryStatus?: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED" | null;
     metadata?: Record<string, string>;
     createdAt: string;
     updatedAt: string;
+}
+
+export interface DocumentSummaryItem {
+    documentId: string;
+    filename: string;
+    summary: string | null;
+    shortSummary: string | null;
+    keyTopics: string[] | null;
+    keywords: string[] | null;
+    summaryStatus: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED" | null;
 }
 
 export interface Collection {

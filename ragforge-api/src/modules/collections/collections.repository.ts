@@ -80,7 +80,7 @@ export class CollectionsRepository {
         collectionId: string,
         data: {
             name?: string;
-            description?: string;
+            description?: string | null;
         },
     ) {
 

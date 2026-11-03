@@ -12,7 +12,7 @@ const OFF_TOPIC =
     /^(what is the weather|tell me a joke|write a poem|generate an image|draw|paint)/i;
 
 const SUMMARY_REQUESTS =
-    /(summarise|summarize|summary|overview|key points|main topics|important points|what are these documents about|summarise my documents|summarize my documents|summarise the collection|summarize the collection)/i;
+    /(summari[sz]e|summary|overview|key points|main topics|important points|what are these documents about|summari[sz]e my documents|summari[sz]e the collection|what topics are covered|topics covered|what.{0,30}knowledge base.{0,20}(?:cover|contain|include)|knowledge base topics)/i;
 
 export class QueryRouterService {
     route(

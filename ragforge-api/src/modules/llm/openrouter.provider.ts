@@ -1,4 +1,5 @@
 import { env } from "../../config/env.config.js";
+import { LlmGenerateOptions } from "./llm.interface.js";
 
 export class OpenRouterProvider {
     private readonly apiKey = env.OPENROUTER_API_KEY;
@@ -7,6 +8,7 @@ export class OpenRouterProvider {
     async generate(
         prompt: string,
         signal?: AbortSignal,
+        options?: LlmGenerateOptions,
     ): Promise<string> {
         const response = await fetch(
             "https://openrouter.ai/api/v1/chat/completions",
@@ -25,6 +27,7 @@ export class OpenRouterProvider {
                             content: prompt,
                         },
                     ],
+                    ...(options?.maxOutputTokens ? { max_tokens: options.maxOutputTokens } : {}),
                 }),
             },
         );

@@ -3,7 +3,7 @@ import { GeminiProvider } from "./gemini.provider.js";
 import { OllamaService } from "./ollama.provider.js";
 import { logger } from "../../logger/logger.js";
 import { OpenRouterProvider } from "./openrouter.provider.js";
-import { LlmProvider } from "./llm.interface.js";
+import { LlmGenerateOptions, LlmProvider } from "./llm.interface.js";
 
 export class LlmFactory {
     static create(): LlmProvider {
@@ -38,9 +38,9 @@ export class LlmFactory {
         const ollama = new OllamaService();
 
         return {
-            generate: async (prompt: string, signal?: AbortSignal) => {
+            generate: async (prompt: string, signal?: AbortSignal, options?: LlmGenerateOptions) => {
                 try {
-                    return await gemini.generate(prompt, signal);
+                    return await gemini.generate(prompt, signal, options);
                 } catch (err) {
                     if ((err as Error).message === "Aborted") throw err;
 
@@ -49,7 +49,7 @@ export class LlmFactory {
                         "Gemini failed, falling back to Ollama",
                     );
 
-                    return ollama.generate(prompt, signal);
+                    return ollama.generate(prompt, signal, options);
                 }
             },
 
@@ -95,11 +95,12 @@ export class LlmFactory {
         const ollama = new OllamaService();
 
         return {
-            generate: async (prompt: string, signal?: AbortSignal) => {
+            generate: async (prompt: string, signal?: AbortSignal, options?: LlmGenerateOptions) => {
                 try {
                     return await openrouter.generate(
                         prompt,
                         signal,
+                        options,
                     );
                 } catch (err) {
                     if ((err as Error).message === "Aborted") throw err;
@@ -112,6 +113,7 @@ export class LlmFactory {
                     return ollama.generate(
                         prompt,
                         signal,
+                        options,
                     );
                 }
             },

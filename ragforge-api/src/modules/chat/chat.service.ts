@@ -10,6 +10,7 @@ import { ConversationSummarizerService } from "../conversation/summarization/con
 import { EvaluationService } from "../evaluation/evaluation.service.js";
 import { logger } from "../../logger/logger.js";
 import { LlmFactory } from "../llm/llm.factory.js";
+import { DocumentSummaryRepository } from "../document-summary/document-summary.repository.js";
 
 // Singletons — instantiated once at module load, shared across all requests
 const retrievalService = new RetrievalService();
@@ -21,8 +22,17 @@ const queryExpansion = new QueryExpansionService();
 const queryRouter = new QueryRouterService();
 const summarizer = new ConversationSummarizerService();
 const evaluationService = new EvaluationService();
+const documentSummaryRepository = new DocumentSummaryRepository();
 
 const STREAM_TIMEOUT_MS = 120_000;
+const NO_RELEVANT_DOCUMENTS_ANSWER =
+    "I couldn't find relevant information in your processed documents. Try asking about a topic covered in your knowledge base, or check that your documents have finished processing.";
+
+interface KnowledgeBaseSummary {
+    prompt: string | null;
+    answer: string;
+    sources: ChatResponse["sources"];
+}
 
 export class ChatService {
 
@@ -35,6 +45,7 @@ export class ChatService {
     private readonly queryRouter = queryRouter;
     private readonly summarizer = summarizer;
     private readonly evaluationService = evaluationService;
+    private readonly documentSummaryRepository = documentSummaryRepository;
 
     async chat(
         question: string,
@@ -116,38 +127,16 @@ export class ChatService {
             );
 
         } else if (route === "summary") {
-
-            const summaryContext =
-                await this.retrievalService.retrieveContext(
-                    question,
-                    50, // much larger context
-                    tenantId,
-                    collectionName,
-                    metadata,
-                );
-
-            const prompt = `
-                Summarise the key points, important topics, technologies,
-                skills, concepts and major themes from the provided documents.
-
-                DOCUMENT CONTENT:
-
-                ${summaryContext.context}
-
-                Provide:
-                - Main topics
-                - Key concepts
-                - Important technologies
-                - Notable findings
-                - Short overall summary
-            `;
-
-            answer = await this.llm.generate(prompt);
-
-            builtContext = {
-                context: summaryContext.context,
-                sources: summaryContext.sources,
-            };
+            const summary = await this.buildKnowledgeBaseSummary(
+                question,
+                tenantId,
+                collectionName,
+                metadata,
+            );
+            answer = summary.prompt
+                ? await this.llm.generate(summary.prompt)
+                : summary.answer;
+            builtContext.sources = summary.sources;
 
         } else {
 
@@ -231,14 +220,8 @@ export class ChatService {
 
             if (!hasContext) {
 
-                logger.info(
-                    { question },
-                    "No retrieval context found. Falling back to model knowledge",
-                );
-
-                answer = await this.llm.generate(
-                    question,
-                );
+                logger.info({ question }, "No retrieval context found");
+                answer = NO_RELEVANT_DOCUMENTS_ANSWER;
 
             } else {
 
@@ -257,16 +240,14 @@ export class ChatService {
             }
         }
 
-        await Promise.all([
-            this.conversationService.addUserMessage(
-                currentConversationId,
-                question,
-            ),
-            this.conversationService.addAssistantMessage(
-                currentConversationId,
-                answer,
-            ),
-        ]);
+        await this.conversationService.addUserMessage(
+            currentConversationId,
+            question,
+        );
+        await this.conversationService.addAssistantMessage(
+            currentConversationId,
+            answer,
+        );
 
         if (isNewConversation) {
             this.conversationService
@@ -393,42 +374,19 @@ export class ChatService {
                     signal,
                 );
             } else if (route === "summary") {
-
-                const summaryContext =
-                    await this.retrievalService.retrieveContext(
-                        question,
-                        50,
-                        tenantId,
-                        collectionName,
-                        metadata,
-                    );
-
-                const prompt = `
-                    Summarise the key points, important topics, technologies,
-                    skills, concepts and major themes from the provided documents.
-
-                    DOCUMENT CONTENT:
-
-                    ${summaryContext.context}
-
-                    Provide:
-                    - Main topics
-                    - Key concepts
-                    - Important technologies
-                    - Notable findings
-                    - Short overall summary
-                `;
-
-                answer = await this.llm.stream(
-                    prompt,
-                    onToken,
-                    signal,
+                const summary = await this.buildKnowledgeBaseSummary(
+                    question,
+                    tenantId,
+                    collectionName,
+                    metadata,
                 );
-
-                builtContext = {
-                    context: summaryContext.context,
-                    sources: summaryContext.sources,
-                };
+                if (summary.prompt) {
+                    answer = await this.llm.stream(summary.prompt, onToken, signal);
+                } else {
+                    answer = summary.answer;
+                    onToken(answer);
+                }
+                builtContext.sources = summary.sources;
 
             } else {
 
@@ -511,16 +469,9 @@ export class ChatService {
 
             if (!hasContext) {
 
-                logger.info(
-                    { question },
-                    "No retrieval context found. Falling back to model knowledge",
-                );
-
-                answer = await this.llm.stream(
-                    question,
-                    onToken,
-                    signal,
-                );
+                logger.info({ question }, "No retrieval context found");
+                answer = NO_RELEVANT_DOCUMENTS_ANSWER;
+                onToken(answer);
 
             } else {
 
@@ -556,16 +507,14 @@ export class ChatService {
             }
         }
 
-        await Promise.all([
-            this.conversationService.addUserMessage(
-                currentConversationId,
-                question,
-            ),
-            this.conversationService.addAssistantMessage(
-                currentConversationId,
-                answer,
-            ),
-        ]);
+        await this.conversationService.addUserMessage(
+            currentConversationId,
+            question,
+        );
+        await this.conversationService.addAssistantMessage(
+            currentConversationId,
+            answer,
+        );
 
         if (isNewConversation) {
             this.conversationService
@@ -587,5 +536,89 @@ export class ChatService {
             conversationId: currentConversationId,
             sources: builtContext.sources,
         };
+    }
+
+    private async buildKnowledgeBaseSummary(
+        question: string,
+        tenantId: string,
+        collectionName?: string,
+        metadata?: Record<string, string>,
+    ): Promise<KnowledgeBaseSummary> {
+        const documents = await this.documentSummaryRepository.findAllForTenant(
+            tenantId,
+            collectionName,
+        );
+        const availableSummaries = documents.filter(document => document.summary);
+
+        if (availableSummaries.length === 0) {
+            const context = await this.retrievalService.retrieveContext(
+                question,
+                50,
+                tenantId,
+                collectionName,
+                metadata,
+            );
+
+            if (!context.context.trim() || context.sources.length === 0) {
+                return {
+                    prompt: null,
+                    answer: documents.length > 0
+                        ? "Your documents are still being summarized. Please try again shortly."
+                        : "There are no processed documents in this knowledge base yet.",
+                    sources: [],
+                };
+            }
+
+            return {
+                prompt: this.buildSummaryPrompt(question, context.context, false),
+                answer: "",
+                sources: context.sources,
+            };
+        }
+
+        const summaryContext = availableSummaries.map(document => {
+            const topics = document.keyTopics?.length
+                ? `\nKey topics: ${document.keyTopics.join(", ")}`
+                : "";
+            const keywords = document.keywords?.length
+                ? `\nKeywords: ${document.keywords.join(", ")}`
+                : "";
+
+            return `## ${document.filename}\n${document.shortSummary || document.summary}${topics}${keywords}`;
+        }).join("\n\n");
+        const documentsWithoutSummary = documents.filter(document => !document.summary);
+        const unavailableNote = documentsWithoutSummary.length > 0
+            ? `\n\nSummaries are not available yet for: ${documentsWithoutSummary.map(document => document.filename).join(", ")}. Mention this briefly and do not infer their contents.`
+            : "";
+        const sources = availableSummaries.map(document => ({
+            documentId: document.documentId,
+            filename: document.filename,
+            chunkIndex: -1,
+            similarity: 1,
+        }));
+
+        return {
+            prompt: this.buildSummaryPrompt(question, `${summaryContext}${unavailableNote}`, true),
+            answer: "",
+            sources,
+        };
+    }
+
+    private buildSummaryPrompt(question: string, context: string, perDocument: boolean): string {
+        return `
+            Answer the user's knowledge-base question using only the document information below.
+            Do not use outside knowledge or invent details. If the information does not answer
+            the question, say so clearly.
+
+            ${perDocument
+                ? "For a summary or overview, give each document its own heading and a concise summary, then finish with common themes and key topics across the knowledge base. Keep topics attributable to their source document."
+                : "Summarize only the retrieved document excerpts, attribute findings to the source files, and say when excerpts are insufficient to summarize a document fully."}
+
+            USER QUESTION:
+            ${question}
+
+            DOCUMENT INFORMATION:
+            ${context}
+        `;
     }
 }

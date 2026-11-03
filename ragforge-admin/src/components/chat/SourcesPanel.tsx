@@ -31,8 +31,9 @@ export function SourcesPanel({ sources }: SourcesPanelProps) {
                             <div className="min-w-0 flex-1">
                                 <p className="font-medium text-[#2c2825] truncate">{src.filename}</p>
                                 <p className="text-surface-400 mt-0.5 text-xs">
-                                    Chunk #{src.chunkIndex + 1}
-                                    {src.similarity != null && <> · {(src.similarity * 100).toFixed(0)}% match</>}
+                                    {src.chunkIndex < 0
+                                        ? "Document summary"
+                                        : <>Chunk #{src.chunkIndex + 1}{src.similarity != null && <> · {(src.similarity * 100).toFixed(0)}% match</>}</>}
                                 </p>
                             </div>
                         </div>

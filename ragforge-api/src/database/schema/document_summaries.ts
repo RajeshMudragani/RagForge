@@ -25,9 +25,9 @@ export const documentSummaries = pgTable(
 
         shortSummary: text("short_summary"),
 
-        keyTopics: jsonb("key_topics"),
+        keyTopics: jsonb("key_topics").$type<string[]>(),
 
-        keywords: jsonb("keywords"),
+        keywords: jsonb("keywords").$type<string[]>(),
 
         createdAt: timestamp("created_at", {
             withTimezone: true,

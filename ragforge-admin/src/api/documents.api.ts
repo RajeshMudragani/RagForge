@@ -1,5 +1,5 @@
 import api from "./client";
-import type { Document, ApiResponse } from "../types";
+import type { Document, DocumentSummaryItem, ApiResponse } from "../types";
 
 export const documentsApi = {
     upload: (
@@ -27,8 +27,17 @@ export const documentsApi = {
     list: () =>
         api.get<ApiResponse<Document[]>>("/documents"),
 
+    listSummaries: () =>
+        api.get<ApiResponse<DocumentSummaryItem[]>>("/document-summary"),
+
     get: (id: string) =>
         api.get<ApiResponse<Document>>(`/documents/${id}`),
+
+    update: (id: string, data: { filename?: string; collectionId?: string | null }) =>
+        api.patch<ApiResponse<Document>>(`/documents/${id}`, data),
+
+    delete: (id: string) =>
+        api.delete<ApiResponse<{ deleted: boolean }>>(`/documents/${id}`),
 
     getStatus: (id: string) =>
         api.get<ApiResponse<{ status: string; progress?: number }>>(`/documents/${id}/status`),
@@ -38,4 +47,7 @@ export const documentsApi = {
 
     process: (id: string) =>
         api.post<ApiResponse<{ documentId: string; chunksCreated: number; status: string }>>(`/documents/${id}/process`),
+
+    regenerateSummary: (id: string) =>
+        api.post<ApiResponse<{ documentId: string; summaryStatus: "PENDING" }>>(`/document-summary/${id}/summary/regenerate`),
 };

@@ -145,9 +145,9 @@ export function CollectionsPage() {
     const handleEdit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formName.trim() || !editModal) return;
-        setSubmitting(true);
+        setSubmitting(true); setFormError("");
         try {
-            await collectionsApi.update(editModal.id, { name: formName.trim(), description: formDesc.trim() || undefined });
+            await collectionsApi.update(editModal.id, { name: formName.trim(), description: formDesc.trim() || null });
             await fetchCollections();
             setEditModal(null);
         } catch (err: unknown) {
@@ -179,8 +179,8 @@ export function CollectionsPage() {
     return (
         <div className="flex flex-col h-full bg-surface-50">
             {/* Header */}
-            <div className="bg-white border-b border-surface-100 px-6 py-4 shrink-0">
-                <div className="flex items-center justify-between">
+            <div className="bg-white border-b border-surface-100 px-3 sm:px-6 py-4 shrink-0">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h1 className="text-lg font-semibold text-[#1e1c1a]">Collections</h1>
                         <p className="text-sm text-surface-400">Group documents to scope your AI searches</p>
@@ -192,7 +192,7 @@ export function CollectionsPage() {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-auto px-5 py-4">
+            <div className="flex-1 overflow-auto px-3 sm:px-5 py-4">
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
                         <Loader2 className="h-8 w-8 animate-spin text-brand-400" />
@@ -340,10 +340,10 @@ export function CollectionsPage() {
                                     </div>
 
                                     {/* Footer */}
-                                    <div className="px-4 py-3 border-t border-surface-100 flex items-center">
+                                    <div className="px-3 sm:px-4 py-3 border-t border-surface-100 flex flex-wrap items-center gap-2">
                                         <button
                                             onClick={() => openManage(col)}
-                                            className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-brand-50 text-brand-600 hover:bg-brand-100 transition"
+                                            className="flex min-w-0 items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium bg-brand-50 text-brand-600 hover:bg-brand-100 transition"
                                         >
                                             <Files className="h-4 w-4" />
                                             Manage Documents
@@ -424,9 +424,9 @@ export function CollectionsPage() {
                         )}
                     </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-surface-100">
+                    <div className="flex flex-col gap-3 pt-2 border-t border-surface-100 sm:flex-row sm:items-center sm:justify-between">
                         <span className="text-xs text-surface-400">{pendingIds.size} document{pendingIds.size !== 1 ? "s" : ""} selected</span>
-                        <div className="flex gap-2">
+                        <div className="flex justify-end gap-2">
                             <Button variant="secondary" size="sm" onClick={() => setManageCol(null)}>Cancel</Button>
                             <Button size="sm" onClick={handleSaveManage} loading={saving}>Save changes</Button>
                         </div>

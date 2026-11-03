@@ -21,6 +21,8 @@ interface SidebarProps {
     collapsed: boolean;
     onToggle: () => void;
     conversations: UseConversationsReturn;
+    mobileOpen: boolean;
+    onMobileClose: () => void;
 }
 
 /* ── User details popover ────────────────────────────────────────────────── */
@@ -122,7 +124,7 @@ function UserCard({ onClose, onLogout }: UserCardProps) {
 }
 
 /* ── Sidebar ─────────────────────────────────────────────────────────────── */
-export function Sidebar({ collapsed, onToggle, conversations: { conversations, loading, fetch, remove, rename } }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, conversations: { conversations, loading, fetch, remove, rename }, mobileOpen, onMobileClose }: SidebarProps) {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const params   = useParams<{ conversationId?: string }>();
@@ -177,10 +179,22 @@ const initials  = ((user?.firstName?.[0] ?? "") + (user?.lastName?.[0] ?? ""))
     const firstChar = (user?.email?.[0] ?? "?").toUpperCase();
 
     return (
+        <>
+        {mobileOpen && (
+            <button
+                type="button"
+                className="fixed inset-0 z-50 bg-black/40 md:hidden"
+                onClick={onMobileClose}
+                aria-label="Close navigation menu"
+            />
+        )}
         <aside className={clsx(
             "flex flex-col h-screen shrink-0 transition-all duration-200 select-none",
             "bg-[#1e1c1a] text-[#c5b9ad]",
-            collapsed ? "w-[60px]" : "w-[260px]",
+            collapsed ? "md:w-[60px]" : "md:w-[260px]",
+            mobileOpen
+                ? "fixed inset-y-0 left-0 z-[60] w-[min(85vw,300px)] shadow-2xl md:relative md:inset-auto md:z-auto md:shadow-none"
+                : "hidden md:flex",
         )}>
 
             {/* ── Logo row ─────────────────────────────────────────────── */}
@@ -196,19 +210,27 @@ const initials  = ((user?.firstName?.[0] ?? "") + (user?.lastName?.[0] ?? ""))
                 <button
                     onClick={onToggle}
                     className={clsx(
-                        "p-1.5 rounded-lg text-[#706860] hover:text-[#c5b9ad] hover:bg-[#2a2724] transition-colors shrink-0",
+                        "hidden md:block p-1.5 rounded-lg text-[#706860] hover:text-[#c5b9ad] hover:bg-[#2a2724] transition-colors shrink-0",
                         collapsed ? "mx-auto" : "ml-auto",
                     )}
                     title={collapsed ? "Expand" : "Collapse"}
                 >
                     {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
                 </button>
+                <button
+                    type="button"
+                    onClick={onMobileClose}
+                    className="ml-auto rounded-lg p-2 text-[#9e9187] hover:bg-[#2a2724] hover:text-white md:hidden"
+                    aria-label="Close navigation menu"
+                >
+                    <XIcon className="h-4 w-4" />
+                </button>
             </div>
 
             {/* ── New chat ─────────────────────────────────────────────── */}
             <div className={clsx("px-3 py-3", collapsed ? "flex justify-center" : "")}>
                 <button
-                    onClick={() => navigate("/chat")}
+                    onClick={() => { navigate("/chat"); onMobileClose(); }}
                     title="New conversation"
                     className={clsx(
                         "flex items-center gap-2.5 rounded-xl transition-colors text-sm font-medium",
@@ -281,6 +303,7 @@ const initials  = ((user?.firstName?.[0] ?? "") + (user?.lastName?.[0] ?? ""))
                                     ) : (
                                         <NavLink
                                             to={`/chat/${conv.id}`}
+                                            onClick={onMobileClose}
                                             className={clsx(
                                                 "flex items-start gap-2.5 px-3 py-2.5 rounded-xl text-sm transition-colors",
                                                 isActive
@@ -343,6 +366,7 @@ const initials  = ((user?.firstName?.[0] ?? "") + (user?.lastName?.[0] ?? ""))
                 {NAV.map(({ to, icon: Icon, label }) => (
                     <NavLink
                         key={to} to={to} title={label}
+                        onClick={onMobileClose}
                         className={({ isActive }) => clsx(
                             "flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
                             isActive
@@ -398,5 +422,6 @@ const initials  = ((user?.firstName?.[0] ?? "") + (user?.lastName?.[0] ?? ""))
                 </button>
             </div>
         </aside>
+        </>
     );
 }

@@ -181,6 +181,9 @@ export class ConversationRepository {
                 asc(
                     messages.sequenceNumber,
                 ),
+                asc(
+                    messages.createdAt,
+                ),
             )
             .limit(limit);
     }

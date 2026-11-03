@@ -60,7 +60,7 @@ export function LoginPage() {
                     <p className="text-base text-surface-500 mt-1">AI-powered document intelligence</p>
                 </div>
 
-                <div className="bg-white rounded-3xl shadow-panel border border-surface-200 p-8">
+                <div className="bg-white rounded-3xl shadow-panel border border-surface-200 p-5 sm:p-8">
                     {/* Tab switcher */}
                     <div className="flex rounded-2xl bg-surface-100 p-1 mb-6">
                         {(["login", "register"] as const).map((t) => (
@@ -80,7 +80,7 @@ export function LoginPage() {
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {tab === "register" && (
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <Input id="firstName" label="First name" placeholder="Jane"
                                     value={firstName} onChange={(e) => setFirstName(e.target.value)} required autoFocus />
                                 <Input id="lastName" label="Last name" placeholder="Doe"
@@ -119,7 +119,7 @@ export function LoginPage() {
                 </div>
 
                 <p className="text-center text-sm text-surface-400 mt-6">
-                    Enterprise-grade RAG · Built with Ollama &amp; PostgreSQL
+                    Enterprise-grade RAG · Built with OpenRouter &amp; PostgreSQL
                 </p>
             </div>
         </div>

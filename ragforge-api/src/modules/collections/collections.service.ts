@@ -46,7 +46,7 @@ export class CollectionsService {
         collectionId: string,
         data: {
             name?: string;
-            description?: string;
+            description?: string | null;
         },
     ) {
 

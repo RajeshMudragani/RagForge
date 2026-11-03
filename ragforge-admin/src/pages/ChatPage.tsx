@@ -159,13 +159,13 @@ export function ChatPage() {
     return (
         <div className="flex flex-col h-full bg-surface-50 relative">
             {/* Top bar */}
-            <header className="flex items-center justify-between px-5 py-3.5 bg-white border-b border-surface-200 shrink-0">
-                <div className="flex items-center gap-3">
+            <header className="flex items-center justify-between gap-2 px-3 py-3 bg-white border-b border-surface-200 shrink-0 sm:gap-4 sm:px-5 sm:py-3.5">
+                <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                     <div className="w-8 h-8 rounded-xl bg-brand-500 flex items-center justify-center shadow-sm">
                         <Bot className="h-[18px] w-[18px] text-white" />
                     </div>
                     <div>
-                        <h1 className="text-base font-semibold text-[#1e1c1a]">RAG Assistant</h1>
+                        <h1 className="text-sm font-semibold text-[#1e1c1a] sm:text-base">RAG Assistant</h1>
                         <p className="text-xs text-surface-400">Powered by Ollama</p>
                     </div>
                 </div>
@@ -177,13 +177,13 @@ export function ChatPage() {
                             setShowCollPicker(v => !v);
                         }}
                         className={clsx(
-                            "flex items-center gap-2 px-3.5 py-2 rounded-xl border text-sm transition-colors bg-white",
+                            "flex max-w-[48vw] items-center gap-1.5 px-2.5 py-2 rounded-xl border text-xs transition-colors bg-white sm:max-w-none sm:gap-2 sm:px-3.5 sm:text-sm",
                             showCollPicker
                                 ? "border-brand-400 text-brand-600"
                                 : "border-surface-200 text-surface-600 hover:border-brand-400 hover:text-brand-600",
                         )}
                     >
-                        <span>
+                        <span className="truncate">
                             {selectedCollection
                                 ? <span className="text-brand-600 font-medium">{selectedCollection}</span>
                                 : "All collections"
@@ -293,7 +293,7 @@ export function ChatPage() {
                         </div>
                     </div>
                 ) : (
-                    <div className="max-w-3xl mx-auto px-5 py-7 space-y-6">
+                    <div className="max-w-3xl mx-auto px-3 py-4 space-y-5 sm:px-5 sm:py-7 sm:space-y-6">
                         {messages.map((msg, i) => (
                             <MessageBubble
                                 key={msg.id}
@@ -326,7 +326,7 @@ export function ChatPage() {
             )}
 
             {/* Input — full-width strip, content centred to max-w-3xl */}
-            <div className="shrink-0 w-full bg-surface-50 border-t border-surface-200 px-4 pb-5 pt-3">
+            <div className="shrink-0 w-full bg-surface-50 border-t border-surface-200 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 sm:px-4 sm:pb-5 sm:pt-3">
                 <div className="max-w-3xl mx-auto w-full">
                     <ChatInput
                         onSend={handleSend}

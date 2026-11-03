@@ -2,12 +2,13 @@ import { Ollama } from "ollama";
 import { env } from "../../config/env.config.js";
 import { OLLAMA_LLM_MODEL } from "./llm.constants.js";
 import { ollamaRequestsTotal, llmLatencyMs } from "../metrics/metrics.registry.js";
+import { LlmGenerateOptions } from "./llm.interface.js";
 
 const ollama = new Ollama({ host: env.OLLAMA_BASE_URL });
 
 export class OllamaService {
     
-    async generate(prompt: string, signal?: AbortSignal): Promise<string> {
+    async generate(prompt: string, signal?: AbortSignal, options?: LlmGenerateOptions): Promise<string> {
         ollamaRequestsTotal.inc();
 
         const end = llmLatencyMs.startTimer();
@@ -17,6 +18,9 @@ export class OllamaService {
                 model: OLLAMA_LLM_MODEL,
                 prompt,
                 stream: false,
+                ...(options?.maxOutputTokens
+                    ? { options: { num_predict: options.maxOutputTokens, temperature: 0.1 } }
+                    : {}),
             });
 
             return response.response;

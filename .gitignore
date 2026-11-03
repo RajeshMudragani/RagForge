@@ -92,6 +92,8 @@ vector-store/
 embeddings/
 local-data/
 documents/
+!ragforge-api/src/modules/documents/
+!ragforge-api/src/modules/documents/**
 indexes/
 
 # ==========================================

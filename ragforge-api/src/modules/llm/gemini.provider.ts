@@ -4,6 +4,7 @@ import {
     ollamaRequestsTotal,
     llmLatencyMs,
 } from "../metrics/metrics.registry.js";
+import { LlmGenerateOptions } from "./llm.interface.js";
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 2000;
@@ -42,7 +43,7 @@ export class GeminiProvider {
         });
     }
 
-    async generate(prompt: string, signal?: AbortSignal): Promise<string> {
+    async generate(prompt: string, signal?: AbortSignal, options?: LlmGenerateOptions): Promise<string> {
         ollamaRequestsTotal.inc();
         const end = llmLatencyMs.startTimer();
         try {
@@ -50,6 +51,9 @@ export class GeminiProvider {
                 this.ai.models.generateContent({
                     model: env.GEMINI_MODEL,
                     contents: prompt,
+                    ...(options?.maxOutputTokens
+                        ? { config: { maxOutputTokens: options.maxOutputTokens } }
+                        : {}),
                 }),
                 signal,
             );
