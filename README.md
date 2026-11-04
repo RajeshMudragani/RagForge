@@ -51,13 +51,13 @@ This project is a complete, self-hosted RAG backend. You own the data, you own t
 - **Document ingestion** — Upload PDF, TXT, Markdown, and DOCX files
 - **Guest trial** — Upload up to 3 files (10 MB each), ask questions without signing in, and have trial data automatically deleted after 24 hours
 - **Automatic chunking** — Documents are split into overlapping chunks for better retrieval coverage
-- **Vector embeddings** — Each chunk is converted to a numerical vector using Ollama's embedding models
+- **Vector embeddings** — Each chunk is converted to a numerical vector using the configured OpenRouter embedding model
 - **Hybrid search** — Combines semantic vector search (meaning-based) with keyword full-text search for best-of-both-worlds retrieval
 - **Query rewriting** — Short follow-up questions are automatically expanded using conversation history before searching
 - **Multi-turn conversations** — Conversation memory is maintained per session via a unique `conversationId`
 - **Grounded prompt modes** — `default`, `strict`, and `concise` all answer from retrieved document evidence; `concise` uses bullets
 - **Async ingestion** — Document processing runs in a BullMQ background worker. Upload returns immediately; poll for `READY` status
-- **Fully local** — Runs entirely on your own infrastructure using Ollama. No OpenAI API keys, no data leaving your network
+- **Local development and cloud deployment** — Use MinIO and local Redis/PostgreSQL for development, with OpenRouter for generation and embeddings; production uses hosted PostgreSQL, TLS Redis, and Cloudflare R2
 - **Structured error handling** — Every error returns a consistent JSON shape with typed error codes
 - **Production-ready** — Graceful shutdown, structured logging with Pino, request ID tracing, Helmet security headers
 
@@ -163,7 +163,7 @@ This is what happens every time a user asks a question.
 | Framework        | Express 5             | HTTP server and routing                                       |
 | ORM              | Drizzle ORM           | Type-safe PostgreSQL queries                                  |
 | Database         | PostgreSQL + pgvector | Stores documents, chunks, and vector embeddings               |
-| Object Storage   | MinIO                 | Stores raw uploaded files (S3-compatible)                     |
+| Object Storage   | MinIO / Cloudflare R2 | Stores raw uploaded files (S3-compatible)                     |
 | LLM & Embeddings | Ollama                | Runs LLM (llama3.2) and embedding model (bge-m3) locally      |
 | Job Queue        | BullMQ + ioredis      | Background workers for async document ingestion               |
 | Cache / Sessions | Redis (node-redis)    | Rate limiting, session storage                                |
@@ -181,6 +181,7 @@ Before running this project you need the following installed and running:
 ### 1. PostgreSQL with pgvector
 
 pgvector is a PostgreSQL extension that adds vector similarity search. It must be installed in your PostgreSQL instance.
+For Neon, use the direct connection string from the Neon dashboard for migrations (with `sslmode=require`); the initial migration enables the `vector` extension.
 
 ```bash
 # Using Docker (recommended for local dev)
@@ -195,7 +196,7 @@ docker run -d \
 
 ### 2. MinIO
 
-MinIO is an S3-compatible object store used to store uploaded files.
+MinIO is an S3-compatible object store used to store uploaded files locally.
 
 ```bash
 docker run -d \
@@ -209,21 +210,29 @@ docker run -d \
 
 MinIO console is available at `http://localhost:9001` (admin / admin@123).
 
-### 3. Ollama
+#### Use Cloudflare R2 in deployment
 
-Ollama runs LLMs and embedding models locally.
+The API supports MinIO for local development and Cloudflare R2 for production through its storage provider abstraction. Create an R2 bucket in the Cloudflare dashboard, then create an R2 API token with **Object Read & Write** permissions scoped to that bucket. Use the token's Access Key ID and Secret Access Key; do not use a general Cloudflare API token.
 
-```bash
-# Install Ollama — https://ollama.com/download
+Set these variables in the deployed API service's environment/secrets settings (not in the frontend and not by replacing your local `.env`):
 
-# Pull the LLM used for chat
-ollama pull llama3.2
-
-# Pull the embedding model
-ollama pull bge-m3
+```dotenv
+STORAGE_PROVIDER=r2
+R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+R2_ACCESS_KEY_ID=<R2-access-key-id>
+R2_SECRET_ACCESS_KEY=<R2-secret-access-key>
+R2_BUCKET_NAME=<existing-R2-bucket-name>
 ```
 
-Verify Ollama is running at `http://localhost:11434`.
+Find the account ID in the Cloudflare dashboard. Keep the bucket pre-created in R2; the scoped Object Read & Write token cannot create buckets. Local `.env` can keep `STORAGE_PROVIDER=minio` and its `MINIO_*` settings. In production (`NODE_ENV=production`), the API selects R2 automatically and requires the `R2_*` settings. The application does not need any R2 credentials in the frontend.
+
+### 3. OpenRouter (LLM and embeddings)
+
+OpenRouter is the default LLM provider in both development and production. Set `OPENROUTER_API_KEY` and, optionally, `OPENROUTER_MODEL` and `OPENROUTER_EMBEDDING_MODEL` in the API environment. The default embedding model is `openai/text-embedding-3-small` with 1024 dimensions. Keep the same embedding model and dimensions in all environments that share a database.
+
+Ollama is optional for local chat generation only. To use it locally, install Ollama, pull the configured `OLLAMA_LLM_MODEL`, and set `LLM_PROVIDER=ollama`. Embeddings still use OpenRouter.
+
+> **Important:** OpenRouter embeddings are not compatible with vectors previously generated by Ollama or another embedding model. Re-embed existing document chunks before relying on semantic search after changing embedding providers/models. If changing the vector dimension, update the database vector schema and apply a migration as well.
 
 ### 4. Redis
 
@@ -235,6 +244,10 @@ docker run -d \
   -p 6379:6379 \
   redis:7-alpine
 ```
+
+For deployment, the API can connect to Upstash using the Redis protocol URL. Copy the `rediss://` connection URL from your Upstash database details and set it as `REDIS_URL` in the deployed API's environment/secrets. Do not use the Upstash REST URL or token. When `REDIS_URL` is set, it configures the API cache, document status events, and BullMQ workers; it takes precedence over `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, and `REDIS_DB`. Keep local development on the host/port settings above if desired.
+
+BullMQ makes Redis requests even when queues are idle, so review Upstash's current plan pricing and command limits for your expected workload.
 
 ### 5. Node.js
 
@@ -248,7 +261,7 @@ node --version  # should be >= 20
 
 ## Getting Started
 
-RAGForge is split into two independently installed applications: `ragforge-api` and `ragforge-admin`. Start PostgreSQL with the pgvector extension, Redis, MinIO, and the configured LLM provider before starting the API. The API also supports Ollama locally; see [Prerequisites](#prerequisites).
+RAGForge is split into two independently installed applications: `ragforge-api` and `ragforge-admin`. Start PostgreSQL with the pgvector extension, Redis, MinIO (or configure Cloudflare R2), and the configured LLM provider before starting the API. The API also supports Ollama locally; see [Prerequisites](#prerequisites).
 
 ```bash
 # Install and configure the API
@@ -280,11 +293,11 @@ Vite serves the admin UI at `http://localhost:3000` and proxies `/api` requests 
 
 The API reads `ragforge-api/.env` from the API working directory. Start-up validates `process.env` with Zod in `src/config/env.config.ts`; if a value is missing or invalid, the API logs each failing variable and exits before serving requests. Use [`ragforge-api/.env.example`](ragforge-api/.env.example) as the complete template and keep real `.env` files out of version control.
 
-The schema requires `NODE_ENV`, `PORT`, `LOG_LEVEL`, `DATABASE_URL`, all `OLLAMA_*` settings, `EMBEDDING_DIMENSIONS`, all `MINIO_*` settings except `MINIO_REGION`, both JWT expiry settings, `REDIS_HOST`, `REDIS_PORT`, `GEMINI_MODEL`, and `GEMINI_API_KEY`. Numeric settings are coerced to numbers, URLs such as `OLLAMA_BASE_URL` must be valid, and boolean-like settings must be the strings `true` or `false`.
+The API requires `NODE_ENV`, `PORT`, `LOG_LEVEL`, `DATABASE_URL`, `EMBEDDING_DIMENSIONS`, both JWT expiry settings, and `OPENROUTER_API_KEY` when using OpenRouter (the default). Ollama URL/model settings and Gemini credentials are only needed if selecting those local/development providers. MinIO settings are required when MinIO is selected; R2 settings are required when R2 is selected. `REDIS_URL` may be used for hosted Redis such as Upstash, or the API can use `REDIS_HOST`/`REDIS_PORT` for local development. Numeric settings are coerced to numbers, URLs must be valid, and boolean-like settings must be `true` or `false`.
 
-Several settings have schema defaults and may be omitted; these include database pool limits, API prefix and request limits, rate limits, Redis password/database, cache TTLs, worker/job settings, `LLM_PROVIDER`, `OPENROUTER_MODEL`, and `MINIO_REGION`. The current schema still requires non-empty `GEMINI_MODEL` and `GEMINI_API_KEY` even when `LLM_PROVIDER` is `ollama` or `openrouter`; supply values to pass startup validation. Set `OPENROUTER_API_KEY` when using OpenRouter.
+In production (`NODE_ENV=production`), the API forces OpenRouter for generation, R2 for object storage, and requires a TLS Redis URL (`rediss://`) plus a hosted PostgreSQL `DATABASE_URL`. Configure `OPENROUTER_API_KEY`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT`, `REDIS_URL`, and `DATABASE_URL` in the deployment platform's secret/environment settings. Keep secrets out of the admin frontend and source control. `OPENROUTER_MODEL` and `OPENROUTER_EMBEDDING_MODEL` can be set to choose models.
 
-> **Important:** `EMBEDDING_DIMENSIONS` must exactly match the output dimensions of your `OLLAMA_EMBED_MODEL`. For `bge-m3` this is `1024`. If you switch models, update this value and re-run migrations.
+> **Important:** `EMBEDDING_DIMENSIONS` must match the configured embedding model output dimensions (the default is 1024). Changing embedding models requires re-embedding existing chunks even if the dimension stays the same; changing dimensions also requires updating the database vector schema and applying a migration.
 
 The admin UI does not require an env file when using the default Vite proxy. To point it directly at another API URL, create `ragforge-admin/.env.local` and set `VITE_API_URL`, for example `VITE_API_URL=http://localhost:7892/api/v1`. Vite exposes variables prefixed with `VITE_` to browser code, so do not put secrets there.
 

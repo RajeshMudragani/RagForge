@@ -3,8 +3,10 @@ export interface AuthResponse {
     refreshToken: string;
 
     user: {
-        id: string;
+        sub: string;
         email: string;
         role: string;
+        tenantId: string | null;
+        name: string;
     };
 }

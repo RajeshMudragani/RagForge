@@ -3,8 +3,7 @@ export interface User {
     email: string;
     role: "USER" | "ADMIN";
     tenantId: string;
-    firstName?: string;
-    lastName?: string;
+    name?: string;
 }
 
 export interface AuthTokens {

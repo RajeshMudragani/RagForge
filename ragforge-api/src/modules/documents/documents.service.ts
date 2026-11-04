@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { MinioService } from "../../storage/minio/minio.service.js";
+import { StorageService } from "../../storage/storage.service.js";
 import { DocumentsRepository } from "./documents.repository.js";
 import { DOCUMENT_STATUS, STORAGE_KEY_PREFIX, getSupportedDocumentMimeType } from "./documents.constants.js";
 import { BadRequestError, NotFoundError } from "../../common/errors/index.js";
@@ -10,7 +10,7 @@ import { redis } from "../../config/redis.config.js";
 
 export class DocumentsService {
     private readonly documentsRepository = new DocumentsRepository();
-    private readonly minioService = new MinioService();
+    private readonly storageService = new StorageService();
     private readonly collectionsService = new CollectionsService();
     private readonly metadataService = new MetadataService();
     private readonly queueService = new QueueService();
@@ -42,7 +42,7 @@ export class DocumentsService {
 
         const storageKey = `${STORAGE_KEY_PREFIX}/${year}/${month}/${randomUUID()}.${extension}`;
 
-        await this.minioService.uploadObject(
+        await this.storageService.uploadObject(
             storageKey,
             file.buffer,
             file.mimetype,
@@ -125,7 +125,7 @@ export class DocumentsService {
             throw new BadRequestError("Wait for document processing to finish before deleting it.");
         }
 
-        await this.minioService.removeObject(document.storageKey);
+        await this.storageService.removeObject(document.storageKey);
         const deleted = await this.documentsRepository.delete(tenantId, documentId);
         if (!deleted) {
             throw new NotFoundError("Document");

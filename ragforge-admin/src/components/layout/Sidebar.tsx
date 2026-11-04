@@ -51,8 +51,10 @@ function UserCard({ onClose, onLogout }: UserCardProps) {
         setTimeout(() => setCopied(null), 1500);
     };
 
-    const initials = ((user?.firstName?.[0] ?? "") + (user?.lastName?.[0] ?? ""))
-        .toUpperCase() || (user?.email?.slice(0, 2).toUpperCase() ?? "?");
+    const displayName = user?.name?.trim()
+        || user?.email?.split("@")[0]
+        || "Account";
+    const initials = displayName.slice(0, 2).toUpperCase();
 
     const rows = [
         { icon: Mail,      label: "Email",     value: user?.email,    key: "email"    },
@@ -71,11 +73,7 @@ function UserCard({ onClose, onLogout }: UserCardProps) {
                     {initials}
                 </div>
                 <div className="min-w-0">
-                    {(user?.firstName || user?.lastName) && (
-                        <p className="text-sm font-semibold text-white truncate">
-                            {[user.firstName, user.lastName].filter(Boolean).join(" ")}
-                        </p>
-                    )}
+                    <p className="text-sm font-semibold text-white truncate">{displayName}</p>
                     <p className="text-xs text-[#9e9187] truncate">{user?.email}</p>
                 </div>
             </div>
@@ -174,9 +172,10 @@ export function Sidebar({ collapsed, onToggle, conversations: { conversations, l
         if (params.conversationId === id) navigate("/chat");
     };
 
-const initials  = ((user?.firstName?.[0] ?? "") + (user?.lastName?.[0] ?? ""))
-        .toUpperCase() || (user?.email?.slice(0, 2).toUpperCase() ?? "?");
-    const firstChar = (user?.email?.[0] ?? "?").toUpperCase();
+const displayName = user?.name?.trim()
+        || user?.email?.split("@")[0]
+        || "Account";
+    const initials = displayName.slice(0, 2).toUpperCase();
 
     return (
         <>
@@ -405,14 +404,14 @@ const initials  = ((user?.firstName?.[0] ?? "") + (user?.lastName?.[0] ?? ""))
                         showProfile && "ring-brand-400/60",
                         collapsed ? "w-8 h-8 text-sm" : "w-8 h-8 text-sm",
                     )}>
-                        {collapsed ? firstChar : initials}
+                        {initials}
                     </div>
 
                     {!collapsed && (
                         <>
                             <div className="min-w-0 flex-1 text-left">
                                 <p className="text-sm font-medium text-[#e0d9d0] truncate leading-tight">
-                                    {[user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email?.split("@")[0]}
+                                    {displayName}
                                 </p>
                                 <p className="text-xs text-[#706860] truncate capitalize">{user?.role?.toLowerCase()}</p>
                             </div>

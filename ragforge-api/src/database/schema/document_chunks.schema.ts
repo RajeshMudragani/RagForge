@@ -9,6 +9,7 @@ import {
     index,
     varchar,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { documents } from "./documents.schema.js";
 import { env } from "../../config/env.config.js";
@@ -45,5 +46,7 @@ export const documentChunks = pgTable("document_chunks", {
 (table) => [
     index("document_chunks_embedding_hnsw_idx")
         .using("hnsw", table.embedding.op("vector_cosine_ops")),
+    index("document_chunks_content_fts_idx")
+        .using("gin", sql`to_tsvector('english', ${table.content})`),
     ],
 );

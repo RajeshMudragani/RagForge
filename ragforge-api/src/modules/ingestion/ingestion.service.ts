@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
 import { DocumentsRepository } from "../documents/documents.repository.js";
 import { DOCUMENT_STATUS, getSupportedDocumentExtension } from "../documents/documents.constants.js";
-import { MinioService } from "../../storage/minio/minio.service.js";
+import { StorageService } from "../../storage/storage.service.js";
 import { ExtractionService } from "./extraction.service.js";
 import { ChunkingService } from "./chunking.service.js";
 import { EmbeddingsService } from "../embeddings/embeddings.service.js";
@@ -17,7 +17,7 @@ import { redis } from "../../config/redis.config.js";
 
 export class IngestionService {
     private readonly documentsRepository = new DocumentsRepository();
-    private readonly minioService = new MinioService();
+    private readonly storageService = new StorageService();
     private readonly extractionService = new ExtractionService();
     private readonly chunkingService = new ChunkingService();
     private readonly embeddingsService = new EmbeddingsService();
@@ -38,7 +38,7 @@ export class IngestionService {
             .catch(err => logger.error({ err }, "Failed to publish PROCESSING event"));
 
         try {
-            const buffer = await this.minioService.downloadObjectAsBuffer(document.storageKey);
+            const buffer = await this.storageService.downloadObjectAsBuffer(document.storageKey);
             const extension = getSupportedDocumentExtension(document.filename);
             if (!extension) {
                 throw new Error(`Unsupported document type: ${document.filename}`);

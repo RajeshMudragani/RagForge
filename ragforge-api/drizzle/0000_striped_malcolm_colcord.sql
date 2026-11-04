@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS vector;
+--> statement-breakpoint
 CREATE TABLE "collections" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"name" varchar(255) NOT NULL,

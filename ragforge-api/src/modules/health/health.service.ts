@@ -1,7 +1,7 @@
 import { db } from "../../config/db.config.js";
 import { redis } from "../../config/redis.config.js";
-import { MinioService } from "../../storage/minio/minio.service.js";
-import { OllamaService } from "../llm/ollama.provider.js";
+import { StorageService } from "../../storage/storage.service.js";
+import { LlmFactory } from "../llm/llm.factory.js";
 import {
     documentQueue,
     evaluationQueue,
@@ -10,8 +10,8 @@ import {
 
 export class HealthService {
 
-    private readonly minioService = new MinioService();
-    private readonly ollamaService = new OllamaService();
+    private readonly storageService = new StorageService();
+    private readonly llm = LlmFactory.create();
 
     async checkDatabase() {
 
@@ -77,13 +77,13 @@ export class HealthService {
         }
     }
 
-    async checkMinio() {
+    async checkStorage() {
 
         const startedAt = Date.now();
 
         try {
 
-            await this.minioService.healthCheck();
+            await this.storageService.healthCheck();
 
             return {
                 status: "UP",
@@ -101,18 +101,24 @@ export class HealthService {
                 message:
                     error instanceof Error
                         ? error.message
-                        : "MinIO check failed",
+                        : "Object storage check failed",
             };
         }
     }
 
-    async checkOllama() {
+    async checkLlm() {
 
         const startedAt = Date.now();
 
         try {
 
-            await this.ollamaService.healthCheck();
+            const available = await this.llm.healthCheck();
+            if (!available) {
+                return {
+                    status: "DOWN",
+                    message: "Configured LLM provider is unavailable",
+                };
+            }
 
             return {
                 status: "UP",
@@ -130,7 +136,7 @@ export class HealthService {
                 message:
                     error instanceof Error
                         ? error.message
-                        : "Ollama check failed",
+                        : "LLM provider check failed",
             };
         }
     }
@@ -173,14 +179,14 @@ export class HealthService {
         const [
             database,
             redis,
-            minio,
-            ollama,
+            storage,
+            llm,
             bullmq,
         ] = await Promise.all([
             this.checkDatabase(),
             this.checkRedis(),
-            this.checkMinio(),
-            this.checkOllama(),
+            this.checkStorage(),
+            this.checkLlm(),
             this.checkBullMQ(),
         ]);
 
@@ -188,8 +194,8 @@ export class HealthService {
             [
                 database,
                 redis,
-                minio,
-                ollama,
+                storage,
+                llm,
                 bullmq,
             ].every(
                 service =>
@@ -204,8 +210,8 @@ export class HealthService {
             services: {
                 database,
                 redis,
-                minio,
-                ollama,
+                storage,
+                llm,
                 bullmq,
             },
         };

@@ -1,16 +1,11 @@
-import { createClient } from "redis";
-import { env } from "../../config/env.config.js";
+import { createRedisClient } from "../../config/redis.config.js";
 import { logger } from "../../logger/logger.js";
 import { Response } from "express";
 
 const CHANNEL = "document:status";
 
 // Dedicated publisher client (separate from the cache client)
-const publisher = createClient({
-    socket: { host: env.REDIS_HOST, port: env.REDIS_PORT },
-    password: env.REDIS_PASSWORD || undefined,
-    database: env.REDIS_DB,
-});
+const publisher = createRedisClient();
 
 publisher.connect().catch(err => logger.error({ err }, "Document events publisher failed to connect"));
 publisher.on("error", err => logger.error({ err }, "Document events publisher error"));
@@ -47,11 +42,7 @@ function sendToTenant(tenantId: string, data: string) {
 }
 
 // Single subscriber for all tenants — fan-out by tenantId in-process
-const subscriber = createClient({
-    socket: { host: env.REDIS_HOST, port: env.REDIS_PORT },
-    password: env.REDIS_PASSWORD || undefined,
-    database: env.REDIS_DB,
-});
+const subscriber = createRedisClient();
 
 subscriber.connect()
     .then(() => subscriber.subscribe(CHANNEL, (message) => {

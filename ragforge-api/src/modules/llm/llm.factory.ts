@@ -20,13 +20,14 @@ export class LlmFactory {
     }
 
     static createWithFallback(): LlmProvider {
+        if (env.NODE_ENV === "production" || env.LLM_PROVIDER === "openrouter") {
+            return this.create();
+        }
+
         switch (env.LLM_PROVIDER) {
 
             case "gemini":
                 return this.createGeminiFallback();
-
-            case "openrouter":
-                return this.createOpenRouterFallback();
 
             default:
                 return new OllamaService();
@@ -83,71 +84,6 @@ export class LlmFactory {
             healthCheck: async () => {
                 try {
                     return await gemini.healthCheck();
-                } catch {
-                    return ollama.healthCheck();
-                }
-            },
-        };
-    }
-
-    private static createOpenRouterFallback() {
-        const openrouter = new OpenRouterProvider();
-        const ollama = new OllamaService();
-
-        return {
-            generate: async (prompt: string, signal?: AbortSignal, options?: LlmGenerateOptions) => {
-                try {
-                    return await openrouter.generate(
-                        prompt,
-                        signal,
-                        options,
-                    );
-                } catch (err) {
-                    if ((err as Error).message === "Aborted") throw err;
-
-                    logger.warn(
-                        { err },
-                        "OpenRouter failed, falling back to Ollama",
-                    );
-
-                    return ollama.generate(
-                        prompt,
-                        signal,
-                        options,
-                    );
-                }
-            },
-
-            stream: async (
-                prompt: string,
-                onToken: (token: string) => void,
-                signal?: AbortSignal,
-            ): Promise<string> => {
-                try {
-                    return await openrouter.stream(
-                        prompt,
-                        onToken,
-                        signal,
-                    );
-                } catch (err) {
-                    if ((err as Error).message === "Aborted") throw err;
-
-                    logger.warn(
-                        { err },
-                        "OpenRouter stream failed, falling back to Ollama",
-                    );
-
-                    return ollama.stream(
-                        prompt,
-                        onToken,
-                        signal,
-                    );
-                }
-            },
-
-            healthCheck: async () => {
-                try {
-                    return await openrouter.healthCheck();
                 } catch {
                     return ollama.healthCheck();
                 }

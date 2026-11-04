@@ -1,5 +1,5 @@
 import { OfficeParser, type SupportedFileType } from "officeparser";
-import { MinioService } from "../../storage/minio/minio.service.js";
+import { StorageService } from "../../storage/storage.service.js";
 import { SpreadsheetCountRepository } from "./spreadsheet-count.repository.js";
 import { ChatResponse } from "./interfaces/chat-response.interface.js";
 import {
@@ -24,7 +24,7 @@ function parseFileType(filename: string): SupportedFileType | null {
 
 export class SpreadsheetCountService {
     private readonly repository = new SpreadsheetCountRepository();
-    private readonly minio = new MinioService();
+    private readonly storage = new StorageService();
 
     async countOrdersByStatus(
         question: string,
@@ -59,7 +59,7 @@ export class SpreadsheetCountService {
             const fileType = parseFileType(document.filename);
             if (!fileType) continue;
 
-            const buffer = await this.minio.downloadObjectAsBuffer(document.storageKey);
+            const buffer = await this.storage.downloadObjectAsBuffer(document.storageKey);
             const workbook = await OfficeParser.parseOffice(buffer, { fileType });
             let documentMatched = false;
 
@@ -116,7 +116,7 @@ export class SpreadsheetCountService {
             const fileType = parseFileType(document.filename);
             if (!fileType) continue;
 
-            const buffer = await this.minio.downloadObjectAsBuffer(document.storageKey);
+            const buffer = await this.storage.downloadObjectAsBuffer(document.storageKey);
             const workbook = await OfficeParser.parseOffice(buffer, { fileType });
             let documentMatched = false;
 

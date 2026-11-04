@@ -131,6 +131,8 @@ export class AuthService {
             email: string;
             role: string;
             tenantId: string | null;
+            firstName: string;
+            lastName: string;
         },
     ): Promise<AuthResponse> {
 
@@ -189,9 +191,11 @@ export class AuthService {
             accessToken,
             refreshToken,
             user: {
-                id: user.id,
+                sub: user.id,
                 email: user.email,
                 role: user.role,
+                tenantId: user.tenantId,
+                name: `${user.firstName} ${user.lastName}`,
             },
         };
     }

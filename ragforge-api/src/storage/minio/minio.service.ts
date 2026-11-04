@@ -1,13 +1,23 @@
 import { Readable } from "node:stream";
-import { minioClient } from "./minio.client.js";
+import { createMinioClient } from "./minio.client.js";
 import { env } from "../../config/env.config.js";
 
 export class MinioService {
+    private readonly minioClient = createMinioClient();
+
+    private get bucketName(): string {
+        if (!env.MINIO_BUCKET) {
+            throw new Error("MINIO_BUCKET is required when STORAGE_PROVIDER is minio");
+        }
+
+        return env.MINIO_BUCKET;
+    }
+
     async ensureBucketExists(): Promise<void> {
-        const exists = await minioClient.bucketExists(env.MINIO_BUCKET);
+        const exists = await this.minioClient.bucketExists(this.bucketName);
 
         if (!exists) {
-            await minioClient.makeBucket(env.MINIO_BUCKET, env.MINIO_REGION);
+            await this.minioClient.makeBucket(this.bucketName, env.MINIO_REGION);
         }
     }
 
@@ -18,8 +28,8 @@ export class MinioService {
     ): Promise<void> {
         await this.ensureBucketExists();
 
-        await minioClient.putObject(
-            env.MINIO_BUCKET,
+        await this.minioClient.putObject(
+            this.bucketName,
             objectName,
             buffer,
             buffer.length,
@@ -32,8 +42,8 @@ export class MinioService {
     async downloadObject(
         objectName: string,
     ): Promise<Readable> {
-        return minioClient.getObject(
-            env.MINIO_BUCKET,
+        return this.minioClient.getObject(
+            this.bucketName,
             objectName,
         );
     }
@@ -41,8 +51,8 @@ export class MinioService {
     async removeObject(
         objectName: string,
     ): Promise<void> {
-        await minioClient.removeObject(
-            env.MINIO_BUCKET,
+        await this.minioClient.removeObject(
+            this.bucketName,
             objectName,
         );
     }
@@ -50,8 +60,8 @@ export class MinioService {
     async statObject(
         objectName: string,
     ) {
-        return minioClient.statObject(
-            env.MINIO_BUCKET,
+        return this.minioClient.statObject(
+            this.bucketName,
             objectName,
         );
     }
@@ -99,8 +109,6 @@ export class MinioService {
     async healthCheck(): Promise<void> {
         await this.ensureBucketExists();
 
-        await minioClient.bucketExists(
-            env.MINIO_BUCKET,
-        );
+        await this.minioClient.bucketExists(this.bucketName);
     }
 }

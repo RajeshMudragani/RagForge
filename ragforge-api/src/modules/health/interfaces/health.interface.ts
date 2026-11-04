@@ -11,8 +11,8 @@ export interface HealthResponse {
     services: {
         database: ServiceHealth;
         redis: ServiceHealth;
-        minio: ServiceHealth;
-        ollama: ServiceHealth;
+        storage: ServiceHealth;
+        llm: ServiceHealth;
         bullmq: ServiceHealth;
     };
 }

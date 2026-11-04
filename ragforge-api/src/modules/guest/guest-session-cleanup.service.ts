@@ -1,5 +1,5 @@
 import { logger } from "../../logger/logger.js";
-import { MinioService } from "../../storage/minio/minio.service.js";
+import { StorageService } from "../../storage/storage.service.js";
 import { redis } from "../../config/redis.config.js";
 import { GuestSessionRepository } from "./guest-session.repository.js";
 
@@ -7,7 +7,7 @@ const CLEANUP_INTERVAL_MS = 60 * 1000;
 
 export class GuestSessionCleanupService {
     private readonly repository = new GuestSessionRepository();
-    private readonly minio = new MinioService();
+    private readonly storage = new StorageService();
     private interval: NodeJS.Timeout | undefined;
     private running = false;
 
@@ -31,7 +31,7 @@ export class GuestSessionCleanupService {
                 try {
                     const storageKeys = await this.repository.findExpiredStorageKeys(id);
                     for (const storageKey of storageKeys) {
-                        await this.minio.removeObject(storageKey);
+                        await this.storage.removeObject(storageKey);
                     }
                     await this.repository.deleteExpiredSession(id);
                     const cacheKeys = await redis.keys(`retrieval:*:${id}:*`);

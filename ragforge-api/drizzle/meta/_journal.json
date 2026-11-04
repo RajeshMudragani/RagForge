@@ -92,6 +92,13 @@
       "when": 1793703182609,
       "tag": "0012_guest_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793765309789,
+      "tag": "0013_document_chunks_fts_index",
+      "breakpoints": true
     }
   ]
 }
