@@ -94,6 +94,8 @@ local-data/
 documents/
 !ragforge-api/src/modules/documents/
 !ragforge-api/src/modules/documents/**
+!ragforge-api/src/modules/embeddings/
+!ragforge-api/src/modules/embeddings/**
 indexes/
 
 # ==========================================

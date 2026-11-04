@@ -144,8 +144,16 @@ export class OpenRouterProvider {
 
     async healthCheck(): Promise<boolean> {
         try {
-            await this.generate("hello");
-            return true;
+            if (!this.apiKey) return false;
+
+            const response = await fetch("https://openrouter.ai/api/v1/key", {
+                headers: {
+                    Authorization: `Bearer ${this.apiKey}`,
+                },
+                signal: AbortSignal.timeout(10_000),
+            });
+
+            return response.ok;
         } catch {
             return false;
         }

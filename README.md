@@ -698,7 +698,7 @@ Authorization: Bearer <token>
 {
   "success": true,
   "data": {
-    "model": "bge-m3",
+    "model": "openai/text-embedding-3-small",
     "dimensions": 1024,
     "embedding": [0.023, -0.041, 0.187, ...]
   }
